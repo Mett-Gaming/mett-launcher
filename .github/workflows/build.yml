@@ -149,8 +149,8 @@ jobs:
           vpk upload github --repoUrl "$repo" --token "$GH_TOKEN" --outputDir dist --channel linux --publish --merge \
             --releaseName "Mett Launcher ${{ github.ref_name }}" --tag ${{ github.ref_name }}
 
-  # Echter Proton-Lauf: GE-Proton + umu laden, Windows-Chat (mett-net) zweimal über Proton starten,
-  # Host/Join über zwei native mett-netd. Dauert beim ersten Mal lange (Downloads ~1,2 GB), danach gecacht.
+  # Echter Proton-Lauf: GE-Proton + umu laden, Windows-Chat (mett-net) über Proton als Host starten,
+  # ein nativer Linux-Chat tritt bei. Dauert beim ersten Mal lange (Downloads ~1,2 GB), danach gecacht.
   proton-e2e:
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.proton_e2e)
     runs-on: ubuntu-latest
@@ -173,14 +173,16 @@ jobs:
       - name: Werkzeuge
         run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb mingw-w64 python3 > /dev/null
 
-      - name: mett-netd (Linux) und Chat-Beispiel (Windows) bauen
+      - name: mett-netd und Chat (Linux) sowie Chat (Windows) bauen
         working-directory: native
         run: |
           cargo build --release -p mett-netd
+          cargo build --release -p mett-net --example chat
           cargo build --release -p mett-net --example chat --target x86_64-pc-windows-gnu
 
-      - name: Proton- und umu-Cache
-        uses: actions/cache@v4
+      - name: Proton- und umu-Cache laden
+        id: protoncache
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.cache/mett-e2e/proton
@@ -191,8 +193,9 @@ jobs:
       - name: Proton-Ende-zu-Ende-Test
         env:
           METT_PROTON_E2E: "1"
-          METT_E2E_ROOT: ${{ github.workspace }}/../mett-e2e-root
+          METT_E2E_ROOT: ${{ runner.temp }}/mett-e2e-root
           METT_E2E_NETD: ${{ github.workspace }}/native/target/release/mett-netd
+          METT_E2E_CHAT_LINUX: ${{ github.workspace }}/native/target/release/examples/chat
           METT_E2E_CHAT_EXE: ${{ github.workspace }}/native/target/x86_64-pc-windows-gnu/release/examples/chat.exe
         run: |
           # Gecachte Downloads in den Arbeitsordner des Tests legen
@@ -201,10 +204,20 @@ jobs:
           ln -sfn ~/.cache/mett-e2e/tools "$METT_E2E_ROOT/tools"
           xvfb-run -a dotnet test tests/MettLauncher.Core.Tests -c Release --filter "FullyQualifiedName~ProtonE2E" --logger "console;verbosity=detailed"
 
+      - name: Proton- und umu-Cache speichern (auch bei Fehlschlag)
+        if: always() && steps.protoncache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/mett-e2e/proton
+            ~/.cache/mett-e2e/tools
+            ~/.local/share/umu
+          key: proton-e2e-${{ runner.os }}-v1
+
       - name: Proton-Logs sichern
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: proton-e2e-logs
-          path: ${{ github.workspace }}/../mett-e2e-root/logs
+          path: ${{ runner.temp }}/mett-e2e-root/logs
           if-no-files-found: ignore
