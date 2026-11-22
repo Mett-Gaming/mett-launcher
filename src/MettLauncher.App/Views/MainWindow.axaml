@@ -1,0 +1,330 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:MettLauncher.App.ViewModels"
+        xmlns:c="using:MettLauncher.App.Controls"
+        xmlns:v="using:MettLauncher.App.Views"
+        x:Class="MettLauncher.App.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="Mett Launcher"
+        Icon="avares://MettLauncher/Assets/icon.ico"
+        Width="1280" Height="800" MinWidth="960" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BgApp}"
+        FontFamily="{StaticResource UiFont}"
+        Foreground="{StaticResource TextPrimary}"
+        WindowDecorations="BorderOnly">
+
+  <Grid RowDefinitions="48,Auto,*,32">
+
+    <!-- ===== Titelleiste + Hauptnavigation ===== -->
+    <Border x:Name="TitleBar" Background="{StaticResource BgSidebar}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,0,0,1">
+      <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+        <Image Source="avares://MettLauncher/Assets/icon.png" Width="32" Height="32" Margin="12,0,12,0" IsHitTestVisible="False" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+          <Button Classes="nav" Classes.active="{Binding IsLibrary}" Content="BIBLIOTHEK" Command="{Binding ShowLibraryCommand}" />
+          <Button Classes="nav" Classes.active="{Binding IsNews}" Content="NEUIGKEITEN" Command="{Binding ShowNewsCommand}" />
+          <Button Classes="nav" Classes.active="{Binding IsSettings}" Content="EINSTELLUNGEN" Command="{Binding ShowSettingsCommand}" />
+        </StackPanel>
+        <Border Grid.Column="2" x:Name="DragArea" Background="Transparent" />
+        <StackPanel Grid.Column="3" Orientation="Horizontal">
+          <Button Classes="chrome" x:Name="MinButton" ToolTip.Tip="Minimieren" AutomationProperties.Name="Minimieren">
+            <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconMinus}" />
+          </Button>
+          <Button Classes="chrome" x:Name="MaxButton" ToolTip.Tip="Maximieren" AutomationProperties.Name="Maximieren">
+            <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconMaximize}" />
+          </Button>
+          <Button Classes="chrome close" x:Name="CloseButton" ToolTip.Tip="Schließen" AutomationProperties.Name="Schließen">
+            <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconX}" />
+          </Button>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- ===== Hinweise: offline / Launcher-Update ===== -->
+    <StackPanel Grid.Row="1">
+      <Border Background="{StaticResource InfoSubtle}" Padding="16,8" IsVisible="{Binding IsOffline}">
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+          <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconWifiOff}" Foreground="{StaticResource Warning}" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Classes="caption" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" TextWrapping="Wrap"
+                     Text="Offline – GitHub nicht erreichbar. Installierte Spiele starten trotzdem, Neuigkeiten und Versionen sind vom letzten Abruf." />
+          <Button Grid.Column="2" Classes="link" Content="Erneut versuchen" Command="{Binding RetryCommand}" />
+        </Grid>
+      </Border>
+      <Border Background="#2C2218" BorderBrush="{StaticResource BorderStrong}" BorderThickness="0,0,0,1" Padding="16,6" IsVisible="{Binding HasLauncherUpdate}">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
+          <c:LucideIcon Width="16" Height="16" Data="{StaticResource IconDownload}" Foreground="{StaticResource Brand}" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Text="{Binding LauncherUpdateText}" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}" />
+          <Button Grid.Column="2" Classes="ghost" Content="Später" Command="{Binding DismissLauncherUpdateCommand}" />
+          <Button Grid.Column="3" Classes="primary" Content="Jetzt neu starten" Command="{Binding RestartForUpdateCommand}" />
+        </Grid>
+      </Border>
+    </StackPanel>
+
+    <!-- ===== BIBLIOTHEK ===== -->
+    <Grid Grid.Row="2" ColumnDefinitions="280,*" IsVisible="{Binding IsLibrary}">
+      <Border Background="{StaticResource BgSidebar}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,0,1,0">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,12,0,0">
+            <Button Classes="side" Padding="14,8" Command="{Binding ShowNewsCommand}" AutomationProperties.Name="Startseite">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <c:LucideIcon Width="16" Height="16" Data="{StaticResource IconHome}" />
+                <TextBlock Text="STARTSEITE" FontWeight="Bold" FontSize="13" LetterSpacing="0.5" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <Grid Margin="12,0">
+              <TextBox Classes="search" PlaceholderText="Suchen" Text="{Binding SearchText}" />
+              <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconSearch}" Foreground="{StaticResource TextMuted}"
+                            HorizontalAlignment="Left" Margin="9,0,0,0" IsHitTestVisible="False" />
+            </Grid>
+            <StackPanel Orientation="Horizontal" Spacing="6" Margin="14,4,0,0">
+              <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconChevronDown}" Foreground="{StaticResource TextMuted}" />
+              <TextBlock Classes="overline" FontSize="12" Text="SPIELE" />
+              <TextBlock Classes="caption" Text="{Binding GamesHeader}" />
+            </StackPanel>
+          </StackPanel>
+          <ListBox Classes="library" ItemsSource="{Binding FilteredGames}" SelectedItem="{Binding SelectedGame}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:GameViewModel">
+                <Grid ColumnDefinitions="20,*,Auto" ColumnSpacing="8" VerticalAlignment="Center">
+                  <Border Width="20" Height="20" CornerRadius="2" ClipToBounds="True" Background="{StaticResource BgSelected}">
+                    <Panel>
+                      <TextBlock Text="{Binding Name, Converter={x:Static v:InitialConverter.Instance}}" FontFamily="{StaticResource DisplayFont}"
+                                 FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource Brand}"
+                                 IsVisible="{Binding !HasCover}" />
+                      <Image Source="{Binding Cover}" Stretch="UniformToFill" IsVisible="{Binding HasCover}" />
+                    </Panel>
+                  </Border>
+                  <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                             Opacity="{Binding SidebarDimmed, Converter={x:Static v:DimConverter.Instance}}" />
+                  <TextBlock Grid.Column="2" Text="{Binding SidebarStatus}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
+                             Foreground="{StaticResource AccentHover}" Classes.update="{Binding SidebarStatusIsHighlight}" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+            <ListBox.Styles>
+              <Style Selector="TextBlock.update">
+                <Setter Property="Foreground" Value="{StaticResource Highlight}" />
+              </Style>
+            </ListBox.Styles>
+          </ListBox>
+        </DockPanel>
+      </Border>
+
+      <Panel Grid.Column="1">
+        <ContentControl Content="{Binding SelectedGame}" IsVisible="{Binding HasSelectedGame}">
+          <ContentControl.ContentTemplate>
+            <DataTemplate x:DataType="vm:GameViewModel">
+              <v:GameView />
+            </DataTemplate>
+          </ContentControl.ContentTemplate>
+        </ContentControl>
+        <StackPanel IsVisible="{Binding ShowEmptyLibrary}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+          <TextBlock Classes="h1" Text="Noch keine Spiele" HorizontalAlignment="Center" />
+          <TextBlock Classes="body" Text="Der Spielekatalog konnte nicht geladen werden." HorizontalAlignment="Center" />
+          <Button Classes="secondary" Content="Erneut versuchen" Command="{Binding RetryCommand}" HorizontalAlignment="Center" />
+        </StackPanel>
+      </Panel>
+    </Grid>
+
+    <!-- ===== NEUIGKEITEN ===== -->
+    <ScrollViewer Grid.Row="2" IsVisible="{Binding IsNews}" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel MaxWidth="960" Margin="40,24" Spacing="14">
+        <Border Classes="sectionhead"><TextBlock Classes="overline" FontSize="12" Text="NEUIGKEITEN" /></Border>
+        <TextBlock Classes="body" Text="Noch keine Neuigkeiten." IsVisible="{Binding !HasNews}" />
+        <ItemsControl ItemsSource="{Binding NewsItems}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:NewsItemViewModel">
+              <Button Classes="newscard" Command="{Binding OpenCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                <Grid ColumnDefinitions="200,*" ColumnSpacing="16">
+                  <Border Height="72" CornerRadius="2" ClipToBounds="True" Background="{StaticResource HeroFallback}" VerticalAlignment="Top">
+                    <Image Source="{Binding Image}" Stretch="UniformToFill" IsVisible="{Binding HasImage}" />
+                  </Border>
+                  <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Classes="overline" Text="{Binding Meta}" />
+                    <TextBlock Classes="title" Text="{Binding Title}" />
+                    <TextBlock Classes="body" Text="{Binding Excerpt}" IsVisible="{Binding HasExcerpt}" />
+                  </StackPanel>
+                </Grid>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+          <ItemsControl.Styles>
+            <Style Selector="Button.newscard">
+              <Setter Property="Background" Value="{StaticResource BgSurface}" />
+              <Setter Property="Padding" Value="12" />
+              <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+            </Style>
+            <Style Selector="Button.newscard:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+              <Setter Property="Background" Value="{StaticResource BgRaised}" />
+            </Style>
+          </ItemsControl.Styles>
+        </ItemsControl>
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- ===== EINSTELLUNGEN ===== -->
+    <Grid Grid.Row="2" ColumnDefinitions="280,*" IsVisible="{Binding IsSettings}">
+      <Border Background="{StaticResource BgSidebar}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,0,1,0">
+        <StackPanel Margin="0,16,0,0">
+          <Button Classes="side" Classes.active="{Binding IsCatLibrary}" Content="Bibliothek" Command="{Binding ShowSettingsLibraryCommand}" />
+          <Button Classes="side" Classes.active="{Binding IsCatUpdates}" Content="Downloads &amp; Updates" Command="{Binding ShowSettingsUpdatesCommand}" />
+          <Button Classes="side" Classes.active="{Binding IsCatAbout}" Content="Über" Command="{Binding ShowSettingsAboutCommand}" />
+        </StackPanel>
+      </Border>
+      <ScrollViewer Grid.Column="1">
+        <StackPanel Margin="40,24" Spacing="4" MaxWidth="820" HorizontalAlignment="Left">
+          <!-- Bibliothek -->
+          <StackPanel IsVisible="{Binding IsCatLibrary}">
+            <TextBlock Classes="h1" Text="Bibliothek" Margin="0,0,0,8" />
+            <Border Classes="settingrow">
+              <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="Speicherort für Spiele" FontWeight="SemiBold" />
+                  <TextBlock Classes="mono" Text="{Binding LibraryDir}" TextTrimming="PrefixCharacterEllipsis" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" Content="Öffnen" Command="{Binding OpenLibraryDirCommand}" VerticalAlignment="Center" />
+                <Button Grid.Column="2" Classes="secondary" Content="Ändern …" Command="{Binding ChangeLibraryDirCommand}" VerticalAlignment="Center" />
+              </Grid>
+            </Border>
+            <TextBlock Classes="caption" Margin="0,10,0,0" TextWrapping="Wrap"
+                       Text="Neue Installationen landen im neuen Ordner. Bereits installierte Spiele bleiben, wo sie sind." />
+          </StackPanel>
+          <!-- Updates -->
+          <StackPanel IsVisible="{Binding IsCatUpdates}">
+            <TextBlock Classes="h1" Text="Downloads &amp; Updates" Margin="0,0,0,8" />
+            <Border Classes="settingrow">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="Spiele automatisch aktualisieren" FontWeight="SemiBold" />
+                  <TextBlock Classes="caption" Text="Beim Start des Launchers. Festgepinnte Versionen sind ausgenommen." />
+                </StackPanel>
+                <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoUpdateGames}" />
+              </Grid>
+            </Border>
+            <Border Classes="settingrow">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="Vorabversionen anbieten" FontWeight="SemiBold" />
+                  <TextBlock Classes="caption" Text="Pre-Releases von GitHub in „Version wählen“ zeigen." />
+                </StackPanel>
+                <ToggleSwitch Grid.Column="1" IsChecked="{Binding IncludePrereleases}" />
+              </Grid>
+            </Border>
+          </StackPanel>
+          <!-- Über -->
+          <StackPanel IsVisible="{Binding IsCatAbout}">
+            <TextBlock Classes="h1" Text="Über" Margin="0,0,0,8" />
+            <Border Classes="settingrow">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="{Binding LauncherVersion, StringFormat='Mett Launcher {0}'}" FontWeight="SemiBold" />
+                  <TextBlock Classes="caption" Text="{Binding LauncherUpdateStatus}" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="secondary" Content="Nach Updates suchen" Command="{Binding CheckForLauncherUpdateCommand}" VerticalAlignment="Center" />
+              </Grid>
+            </Border>
+            <Border Classes="settingrow">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="Quellcode &amp; Releases" FontWeight="SemiBold" />
+                  <TextBlock Classes="caption" Text="Alle Spiele und der Launcher liegen öffentlich auf GitHub." />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" Content="github.com/Mett-Gaming" Command="{Binding OpenOrgCommand}" VerticalAlignment="Center" />
+              </Grid>
+            </Border>
+            <TextBlock Classes="caption" Margin="0,12,0,0" TextWrapping="Wrap"
+                       Text="Schriften: Archivo, Archivo Black, JetBrains Mono (SIL Open Font License). Icons: Lucide (ISC)." />
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+
+    <!-- ===== Download-Leiste ===== -->
+    <Border Grid.Row="3" Background="{StaticResource BgSidebar}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,1,0,0">
+      <Panel>
+        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center" IsVisible="{Binding !HasDownload}">
+          <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconDownload}" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" />
+          <TextBlock Classes="caption" Text="{Binding DownloadIdleText}" VerticalAlignment="Center" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center" IsVisible="{Binding HasDownload}">
+          <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconDownload}" Foreground="{StaticResource AccentHover}" VerticalAlignment="Center" />
+          <TextBlock Classes="caption" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"
+                     Text="{Binding ActiveDownload.Name, StringFormat='DOWNLOADS · {0}', FallbackValue=''}" />
+          <TextBlock Classes="caption" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"
+                     Text="{Binding ActiveDownload.ProgressText, FallbackValue=''}" />
+          <ProgressBar Width="160" Value="{Binding ActiveDownload.Progress, FallbackValue=0}" Maximum="1" VerticalAlignment="Center" />
+        </StackPanel>
+      </Panel>
+    </Border>
+
+    <!-- ===== Fehlermeldung ===== -->
+    <Border Grid.Row="2" Classes="dialog" Padding="14,10" Margin="16" MaxWidth="460" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+            BorderBrush="{StaticResource Danger}" IsVisible="{Binding HasError}">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+        <TextBlock Text="{Binding ErrorText}" TextWrapping="Wrap" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Classes="ghost" Padding="6" Command="{Binding DismissErrorCommand}" VerticalAlignment="Top">
+          <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconX}" />
+        </Button>
+      </Grid>
+    </Border>
+
+    <!-- ===== Dialoge ===== -->
+    <Panel Grid.Row="1" Grid.RowSpan="3" IsVisible="{Binding IsAnyDialogOpen}">
+      <Border Background="{StaticResource Scrim}" x:Name="Scrim" />
+
+      <!-- Version wählen -->
+      <Border Classes="dialog" Width="640" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsVersionDialogOpen}">
+        <StackPanel Spacing="12">
+          <TextBlock Classes="h1" Text="{Binding VersionDialogGame.Name, StringFormat='{}{0} – Version wählen', FallbackValue=''}" />
+          <TextBlock Classes="body" Text="Ältere Versionen kannst du jederzeit installieren. Eine festgepinnte Version wird nicht automatisch aktualisiert. Einstellungen des Spiels bleiben erhalten." />
+          <ScrollViewer MaxHeight="360">
+            <ItemsControl ItemsSource="{Binding VersionDialogGame.Versions, FallbackValue={x:Null}}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:VersionItemViewModel">
+                  <Border Background="{StaticResource BgSurface}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1"
+                          CornerRadius="{StaticResource RadiusMd}" Padding="14,8">
+                    <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto" ColumnSpacing="14">
+                      <TextBlock Classes="mono" FontSize="14" Foreground="{StaticResource TextPrimary}" Text="{Binding Version}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Classes="caption" Text="{Binding Date}" VerticalAlignment="Center" />
+                      <Border Grid.Column="2" Classes="badge" Classes.success="{Binding IsInstalled}" Classes.brand="{Binding IsPinned}" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding BadgeText}" />
+                      </Border>
+                      <TextBlock Grid.Column="4" Classes="caption" Text="{Binding Size}" VerticalAlignment="Center" />
+                      <Button Grid.Column="5" Classes="secondary" Content="Installieren" Command="{Binding InstallCommand}" IsVisible="{Binding CanInstall}" />
+                      <Button Grid.Column="5" Classes="ghost" Content="{Binding PinLabel}" Command="{Binding TogglePinCommand}" IsVisible="{Binding IsInstalled}" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+          <Button Classes="secondary" Content="Schließen" HorizontalAlignment="Right" Command="{Binding CloseDialogsCommand}" />
+        </StackPanel>
+      </Border>
+
+      <!-- Bestätigen -->
+      <Border Classes="dialog" Width="440" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsConfirmOpen}">
+        <StackPanel Spacing="16">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource DangerSubtle}">
+              <c:LucideIcon Width="18" Height="18" Data="{StaticResource IconTrash}" Foreground="{StaticResource Danger}"
+                            HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <TextBlock Classes="h1" Text="{Binding ConfirmTitle}" VerticalAlignment="Center" />
+          </StackPanel>
+          <TextBlock Classes="body" Text="{Binding ConfirmText}" />
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <Button Classes="ghost" Content="Abbrechen" Command="{Binding CloseDialogsCommand}" />
+            <Button Classes="danger" Content="{Binding ConfirmButton}" Command="{Binding ConfirmAcceptCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Panel>
+  </Grid>
+</Window>

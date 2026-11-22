@@ -1,0 +1,141 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MettLauncher.App.ViewModels"
+             xmlns:c="using:MettLauncher.App.Controls"
+             xmlns:v="using:MettLauncher.App.Views"
+             x:Class="MettLauncher.App.Views.GameView"
+             x:DataType="vm:GameViewModel">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel>
+
+      <!-- Hero mit Spieltitel -->
+      <Grid Height="260" ClipToBounds="True">
+        <Border Background="{StaticResource HeroFallback}" IsVisible="{Binding !HasHero}" />
+        <Image Source="{Binding Hero}" Stretch="UniformToFill" IsVisible="{Binding HasHero}"
+               HorizontalAlignment="Center" VerticalAlignment="Center" />
+        <Border Background="{StaticResource HeroFade}" />
+        <TextBlock Classes="display" Text="{Binding Name}" Margin="32,0,32,24" VerticalAlignment="Bottom">
+          <TextBlock.Effect>
+            <DropShadowEffect OffsetX="0" OffsetY="2" BlurRadius="12" Color="#99000000" />
+          </TextBlock.Effect>
+        </TextBlock>
+      </Grid>
+
+      <!-- Spielen-Leiste -->
+      <Border Background="{StaticResource BgSurface}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,0,0,1"
+              Padding="32,14">
+        <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto" ColumnSpacing="32">
+          <Button Grid.Column="0" Classes="play" Classes.muted="{Binding PrimaryIsMuted}"
+                  Command="{Binding PrimaryCommand}" IsVisible="{Binding ShowPrimary}"
+                  AutomationProperties.AutomationId="PrimaryAction" AutomationProperties.Name="{Binding PrimaryLabel}">
+            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+              <c:LucideIcon Width="20" Height="20" Data="{Binding PrimaryIcon, Converter={x:Static v:IconKeyConverter.Instance}}"
+                            Filled="{Binding PrimaryFilledIcon}" />
+              <TextBlock Text="{Binding PrimaryLabel}" FontWeight="Bold" FontSize="16" LetterSpacing="0.8" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+
+          <!-- Download läuft -->
+          <Border Grid.Column="0" IsVisible="{Binding IsBusy}" Width="260" Height="48" Background="{StaticResource BgRaised}"
+                  BorderBrush="{StaticResource BorderStrong}" BorderThickness="1" CornerRadius="{StaticResource RadiusSm}" Padding="14,6">
+            <Grid RowDefinitions="*,Auto" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+              <TextBlock Text="{Binding ProgressText}" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Classes="mono" Text="{Binding PercentText}" Foreground="{StaticResource AccentHover}" VerticalAlignment="Center" />
+              <Button Grid.Column="2" Grid.RowSpan="2" Classes="ghost" Padding="4" Command="{Binding CancelInstallCommand}"
+                      ToolTip.Tip="Abbrechen" AutomationProperties.Name="Download abbrechen" VerticalAlignment="Center">
+                <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconX}" />
+              </Button>
+              <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" Value="{Binding Progress}" Maximum="1" Margin="0,4,0,2" />
+            </Grid>
+          </Border>
+
+          <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+            <TextBlock Classes="overline" Text="ZULETZT GESPIELT" />
+            <TextBlock Text="{Binding LastPlayedText}" FontWeight="Medium" Foreground="{StaticResource TextSecondary}" />
+          </StackPanel>
+          <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="2">
+            <TextBlock Classes="overline" Text="SPIELZEIT" />
+            <TextBlock Text="{Binding PlaytimeText}" FontWeight="Medium" Foreground="{StaticResource TextSecondary}" />
+          </StackPanel>
+
+          <Button Grid.Column="4" Classes="icon" ToolTip.Tip="Verwalten" AutomationProperties.Name="Verwalten">
+            <c:LucideIcon Width="18" Height="18" Data="{StaticResource IconSettings}" />
+            <Button.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedRight">
+                <MenuItem Header="Lokalen Ordner öffnen" Command="{Binding OpenFolderCommand}" IsEnabled="{Binding HasFolder}" />
+                <MenuItem Header="Dateien überprüfen" Command="{Binding VerifyCommand}" IsEnabled="{Binding IsInstalled}" />
+                <MenuItem Header="Version wählen …" Command="{Binding ShowVersionsCommand}" />
+                <Separator />
+                <MenuItem Header="Automatisch aktualisieren" ToggleType="CheckBox" IsChecked="{Binding AutoUpdate, Mode=OneWay}"
+                          Command="{Binding ToggleAutoUpdateCommand}" IsEnabled="{Binding IsInstalled}" />
+                <Separator />
+                <MenuItem Classes="danger" Header="Deinstallieren" Command="{Binding AskUninstallCommand}" IsEnabled="{Binding IsInstalled}" />
+              </MenuFlyout>
+            </Button.Flyout>
+          </Button>
+          <Button Grid.Column="5" Classes="icon" ToolTip.Tip="Auf GitHub ansehen" AutomationProperties.Name="Auf GitHub ansehen" Command="{Binding OpenRepoCommand}">
+            <c:LucideIcon Width="18" Height="18" Data="{StaticResource IconInfo}" />
+          </Button>
+        </Grid>
+      </Border>
+
+      <!-- Aktivität | Info -->
+      <Grid ColumnDefinitions="*,272" ColumnSpacing="32" Margin="32,24">
+        <StackPanel Spacing="12">
+          <Border Classes="sectionhead"><TextBlock Classes="overline" Text="AKTIVITÄT" /></Border>
+          <TextBlock Classes="body" Text="Noch keine Meldungen zu diesem Spiel." IsVisible="{Binding !HasActivity}" />
+          <ItemsControl ItemsSource="{Binding Activity}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:ActivityItemViewModel">
+                <StackPanel Spacing="8">
+                  <TextBlock Classes="overline" Text="{Binding DayHeader}" />
+                  <Border Classes="card">
+                    <StackPanel Spacing="6">
+                      <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Classes="badge" VerticalAlignment="Center"><TextBlock Text="{Binding Kind}" /></Border>
+                        <TextBlock Classes="title" Text="{Binding Title}" VerticalAlignment="Center" />
+                      </StackPanel>
+                      <ItemsControl ItemsSource="{Binding Lines}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="x:String">
+                            <TextBlock Classes="body" Text="{Binding StringFormat='– {0}'}" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <Button Classes="link" FontSize="14" FontWeight="SemiBold" Content="Mehr auf GitHub"
+                              Command="{Binding OpenCommand}" IsVisible="{Binding HasUrl}" />
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <StackPanel Grid.Column="1" Spacing="10">
+          <Border Classes="sectionhead"><TextBlock Classes="overline" Text="INFO" /></Border>
+          <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
+            <TextBlock Classes="caption" Text="Entwickler" />
+            <TextBlock Grid.Column="1" Classes="caption" Foreground="{StaticResource TextPrimary}" Text="{Binding Developer}" />
+            <TextBlock Grid.Row="1" Classes="caption" Text="Erschienen" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Classes="caption" Foreground="{StaticResource TextPrimary}" Text="{Binding ReleasedText}" />
+            <TextBlock Grid.Row="2" Classes="caption" Text="Version" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Classes="caption" Foreground="{StaticResource TextPrimary}" Text="{Binding VersionText}" />
+            <TextBlock Grid.Row="3" Classes="caption" Text="Größe" />
+            <TextBlock Grid.Row="3" Grid.Column="1" Classes="caption" Foreground="{StaticResource TextPrimary}" Text="{Binding SizeText}" />
+            <TextBlock Grid.Row="4" Classes="caption" Text="Ordner" IsVisible="{Binding HasFolder}" />
+            <TextBlock Grid.Row="4" Grid.Column="1" Classes="caption" Foreground="{StaticResource TextPrimary}" Text="{Binding FolderText}"
+                       IsVisible="{Binding HasFolder}" TextTrimming="PrefixCharacterEllipsis" ToolTip.Tip="{Binding FolderText}" />
+          </Grid>
+          <StackPanel Spacing="6" Margin="0,8,0,0">
+            <Button Classes="link" Content="GitHub-Repository" Command="{Binding OpenRepoCommand}" />
+            <Button Classes="link" Content="Andere Version wählen …" Command="{Binding ShowVersionsCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Grid>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -1,0 +1,62 @@
+# Baut und testet den Mett Launcher bei jedem Push/PR.
+# Ein Tag "v*" (z. B. v0.1.0) erzeugt zusätzlich ein GitHub-Release mit Velopack-Paketen
+# (Setup.exe, Portable-Zip, Delta-Updates) – daraus aktualisieren sich installierte Launcher selbst.
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Version bestimmen
+        id: ver
+        shell: pwsh
+        run: |
+          if ("${{ github.ref }}" -like "refs/tags/v*") { $v = "${{ github.ref_name }}".Substring(1) } else { $v = "0.0.0-ci.${{ github.run_number }}" }
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Tests
+        run: dotnet test -c Release
+        env:
+          METT_SKIP_INTEGRATION: "1"
+
+      - name: Publish
+        run: dotnet publish src/MettLauncher.App -c Release -r win-x64 --self-contained -o publish -p:Version=${{ steps.ver.outputs.version }}
+
+      - name: Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: MettLauncher-${{ steps.ver.outputs.version }}
+          path: publish
+
+      - name: Release mit Velopack (nur bei Tags v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dotnet tool install -g vpk --version 1.2.161
+          $repo = "https://github.com/${{ github.repository }}"
+          # Vorherige Releases holen, damit Delta-Pakete entstehen
+          vpk download github --repoUrl $repo --token $env:GH_TOKEN --outputDir dist
+          vpk pack --packId MettLauncher --packVersion ${{ steps.ver.outputs.version }} --packDir publish --mainExe MettLauncher.exe `
+            --packTitle "Mett Launcher" --packAuthors "Mett Gaming" --icon assets/icon.ico --outputDir dist
+          vpk upload github --repoUrl $repo --token $env:GH_TOKEN --outputDir dist --publish `
+            --releaseName "Mett Launcher ${{ github.ref_name }}" --tag ${{ github.ref_name }}
