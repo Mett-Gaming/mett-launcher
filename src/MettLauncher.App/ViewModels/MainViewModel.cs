@@ -10,7 +10,7 @@ using MettLauncher.Core.News;
 namespace MettLauncher.App.ViewModels;
 
 public enum Section { Library, News, Settings }
-public enum SettingsCategory { Library, Updates, Multiplayer, About }
+public enum SettingsCategory { Library, Updates, Multiplayer, Proton, About }
 
 public sealed partial class MainViewModel : ObservableObject
 {
@@ -27,9 +27,145 @@ public sealed partial class MainViewModel : ObservableObject
         LauncherVersion = _s.LauncherUpdates.CurrentVersion;
         _s.Launcher.GameExited += (_, _) => Dispatcher.UIThread.Post(() => { foreach (var g in Games) g.Recompute(); });
         DisplayName = _s.Settings.Current.DisplayName ?? "";
+        ProtonLog = _s.Settings.Current.ProtonLog;
         _s.Net.EventReceived += ev => Dispatcher.UIThread.Post(() => OnNetEvent(ev));
         UpdateNetStatus();
     }
+
+    // ================= Linux / Proton =================
+
+    public bool IsLinux => AppServices.IsLinux;
+    public string MultiplayerHint => "Ohne Account und ohne eigenen Server: Spiele verbinden sich direkt (Peer-to-Peer, verschlüsselt). Klappt das wegen eines Routers nicht, läuft der Verkehr verschlüsselt über ein Relay von n0 (iroh)."
+        + (OperatingSystem.IsWindows() ? " Fragt Windows nach Netzwerkzugriff für mett-netd, erlaube ihn für private Netzwerke, damit direkte Verbindungen klappen." : "");
+
+    // Hilfsprogramm-Downloads (Proton, umu) teilen sich die Download-Leiste mit Spielen.
+    [ObservableProperty] public partial string? ToolDownloadText { get; set; }
+    [ObservableProperty] public partial string ToolDownloadDetail { get; set; } = "";
+    [ObservableProperty] public partial double ToolDownloadProgress { get; set; }
+    public bool HasToolDownload => ToolDownloadText is not null && ActiveDownload is null;
+    partial void OnToolDownloadTextChanged(string? value) { OnPropertyChanged(nameof(HasToolDownload)); OnPropertyChanged(nameof(ShowIdleDownloads)); }
+    private Task<bool>? _protonSetup;
+
+    private Progress<MettLauncher.Core.IO.DownloadProgress> ToolProgress() => new(p =>
+    {
+        ToolDownloadProgress = p.Fraction ?? 0;
+        ToolDownloadDetail = p.Total is { } total ? $"{Formatting.Size(p.Received)} / {Formatting.Size(total)}" : Formatting.Size(p.Received);
+    });
+
+    /// <summary>Richtet umu und (falls nötig) GE-Proton ein. Läuft nur einmal gleichzeitig; Fehler werden angezeigt.</summary>
+    public Task<bool> EnsureProtonAsync() =>
+        _protonSetup is { IsCompleted: false } running ? running : (_protonSetup = SetupProtonAsync());
+
+    private async Task<bool> SetupProtonAsync()
+    {
+        try
+        {
+            if (_s.Umu.Resolve() is null)
+            {
+                ToolDownloadText = "PROTON · umu-launcher wird eingerichtet";
+                await _s.Umu.EnsureAsync(ToolProgress());
+            }
+            if (_s.Proton.ListManaged().Count == 0 && _s.Proton.ListSteam().Count == 0)
+            {
+                ToolDownloadText = "PROTON · GE-Proton wird geladen (einmalig, ca. 600 MB)";
+                await _s.Proton.EnsureAsync(ToolProgress());
+            }
+            RefreshProtonInfo();
+            foreach (var g in Games) g.Recompute();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Proton konnte nicht eingerichtet werden: {ex.Message}");
+            return false;
+        }
+        finally
+        {
+            ToolDownloadText = null;
+            ToolDownloadDetail = "";
+            ToolDownloadProgress = 0;
+        }
+    }
+
+    // ---- Dialog „Proton-Version“ pro Spiel ----
+    [ObservableProperty] public partial GameViewModel? ProtonDialogGame { get; set; }
+    public ObservableCollection<ProtonOptionViewModel> ProtonOptions { get; } = [];
+    public bool IsProtonDialogOpen => ProtonDialogGame is not null;
+    partial void OnProtonDialogGameChanged(GameViewModel? value) { OnPropertyChanged(nameof(IsProtonDialogOpen)); OnPropertyChanged(nameof(IsAnyDialogOpen)); }
+
+    public void OpenProtonDialog(GameViewModel game)
+    {
+        ProtonOptions.Clear();
+        var current = game.ProtonVersion;
+        var newest = _s.Proton.ListManaged().FirstOrDefault();
+        ProtonOptions.Add(new ProtonOptionViewModel(this, null,
+            newest is null ? "Neueste GE-Proton (wird beim Start geladen)" : $"Neueste GE-Proton (aktuell {newest.Name})", current is null));
+        foreach (var p in _s.Proton.ListAll())
+            ProtonOptions.Add(new ProtonOptionViewModel(this, p.Name, p.Display, string.Equals(current, p.Name, StringComparison.Ordinal)));
+        ProtonDialogGame = game;
+    }
+
+    public void SelectProton(string? name)
+    {
+        ProtonDialogGame?.SetProtonVersion(name);
+        CloseDialogs();
+    }
+
+    // ---- Einstellungen → Proton ----
+    [ObservableProperty] public partial string ProtonInfo { get; set; } = "";
+    [ObservableProperty] public partial string UmuInfo { get; set; } = "";
+    [ObservableProperty] public partial string SteamProtonInfo { get; set; } = "";
+    [ObservableProperty] public partial string ProtonUpdateStatus { get; set; } = "";
+    [ObservableProperty] public partial bool ProtonLog { get; set; }
+    partial void OnProtonLogChanged(bool value) => _s.Settings.Update(s => s with { ProtonLog = value });
+
+    private void RefreshProtonInfo()
+    {
+        if (!IsLinux) return;
+        var managed = _s.Proton.ListManaged();
+        ProtonInfo = managed.Count == 0
+            ? "Noch keine GE-Proton geladen – passiert automatisch beim ersten Spielstart."
+            : string.Join(", ", managed.Select(m => m.Name));
+        var steam = _s.Proton.ListSteam();
+        SteamProtonInfo = steam.Count == 0 ? "Keine gefunden." : string.Join(", ", steam.Select(m => m.Name));
+        var umu = _s.Umu.Resolve();
+        UmuInfo = umu switch
+        {
+            null => _s.Umu.HasPython ? "Wird beim ersten Spielstart eingerichtet." : "python3 fehlt – bitte über die Paketverwaltung installieren.",
+            { Source: MettLauncher.Core.Proton.UmuSource.System } => $"System-Installation ({umu.Path})",
+            _ => $"Vom Launcher verwaltet ({umu.Version ?? "?"})",
+        };
+    }
+
+    [RelayCommand]
+    private async Task UpdateProtonAsync()
+    {
+        ProtonUpdateStatus = "Wird geprüft …";
+        try
+        {
+            var update = await _s.Proton.CheckForUpdateAsync();
+            if (update is null) { ProtonUpdateStatus = "Du hast die neueste GE-Proton."; return; }
+            ToolDownloadText = $"PROTON · {update.Tag} wird geladen";
+            await _s.Proton.InstallAsync(update, ToolProgress());
+            ProtonUpdateStatus = $"{update.Tag} installiert. Spiele ohne feste Version nutzen sie ab dem nächsten Start.";
+        }
+        catch (Exception ex) { ProtonUpdateStatus = $"Fehlgeschlagen: {ex.Message}"; }
+        finally
+        {
+            ToolDownloadText = null;
+            ToolDownloadDetail = "";
+            RefreshProtonInfo();
+            foreach (var g in Games) g.Recompute();
+        }
+    }
+
+    [RelayCommand]
+    private void OpenProtonLogs()
+    {
+        Directory.CreateDirectory(_s.Paths.LogDir);
+        Shell.OpenFolder(_s.Paths.LogDir);
+    }
+
 
     // ================= Mehrspieler =================
 
@@ -194,8 +330,9 @@ public sealed partial class MainViewModel : ObservableObject
     public bool HasError => ErrorText is not null;
     public bool HasLauncherUpdate => PendingLauncherVersion is not null;
     public bool HasDownload => ActiveDownload is not null;
+    public bool ShowIdleDownloads => !HasDownload && !HasToolDownload;
     public bool IsVersionDialogOpen => VersionDialogGame is not null;
-    public bool IsAnyDialogOpen => IsVersionDialogOpen || IsConfirmOpen || IsJoinDialogOpen || IsNameDialogOpen;
+    public bool IsAnyDialogOpen => IsVersionDialogOpen || IsConfirmOpen || IsJoinDialogOpen || IsNameDialogOpen || IsProtonDialogOpen;
     public bool HasNews => NewsItems.Count > 0;
     public string GamesHeader => $"({Games.Count})";
     public string LauncherUpdateText => $"Mett Launcher {PendingLauncherVersion} ist bereit. Neustarten, um das Update abzuschließen.";
@@ -204,6 +341,7 @@ public sealed partial class MainViewModel : ObservableObject
     public bool IsCatUpdates => SettingsCategory == SettingsCategory.Updates;
     public bool IsCatAbout => SettingsCategory == SettingsCategory.About;
     public bool IsCatMultiplayer => SettingsCategory == SettingsCategory.Multiplayer;
+    public bool IsCatProton => SettingsCategory == SettingsCategory.Proton;
     public bool CanSelfUpdate => _s.LauncherUpdates.IsInstalled;
 
     partial void OnSectionChanged(Section value)
@@ -216,7 +354,7 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnSearchTextChanged(string value) => ApplyFilter();
     partial void OnErrorTextChanged(string? value) => OnPropertyChanged(nameof(HasError));
     partial void OnPendingLauncherVersionChanged(string? value) { OnPropertyChanged(nameof(HasLauncherUpdate)); OnPropertyChanged(nameof(LauncherUpdateText)); }
-    partial void OnActiveDownloadChanged(GameViewModel? value) => OnPropertyChanged(nameof(HasDownload));
+    partial void OnActiveDownloadChanged(GameViewModel? value) { OnPropertyChanged(nameof(HasDownload)); OnPropertyChanged(nameof(HasToolDownload)); OnPropertyChanged(nameof(ShowIdleDownloads)); }
     partial void OnVersionDialogGameChanged(GameViewModel? value) { OnPropertyChanged(nameof(IsVersionDialogOpen)); OnPropertyChanged(nameof(IsAnyDialogOpen)); }
     partial void OnIsConfirmOpenChanged(bool value) => OnPropertyChanged(nameof(IsAnyDialogOpen));
     partial void OnIsLoadingChanged(bool value) => OnPropertyChanged(nameof(ShowEmptyLibrary));
@@ -226,6 +364,8 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsCatUpdates));
         OnPropertyChanged(nameof(IsCatAbout));
         OnPropertyChanged(nameof(IsCatMultiplayer));
+        OnPropertyChanged(nameof(IsCatProton));
+        if (value == SettingsCategory.Proton) RefreshProtonInfo();
     }
     partial void OnAutoUpdateGamesChanged(bool value) => _s.Settings.Update(s => s with { AutoUpdate = value });
     partial void OnIncludePrereleasesChanged(bool value)
@@ -351,6 +491,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand] private void ShowSettingsUpdates() => SettingsCategory = SettingsCategory.Updates;
     [RelayCommand] private void ShowSettingsAbout() => SettingsCategory = SettingsCategory.About;
     [RelayCommand] private void ShowSettingsMultiplayer() => SettingsCategory = SettingsCategory.Multiplayer;
+    [RelayCommand] private void ShowSettingsProton() => SettingsCategory = SettingsCategory.Proton;
 
     [RelayCommand]
     private void OpenNewsItem(NewsItemViewModel? item)
@@ -413,6 +554,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         VersionDialogGame = null;
         JoinDialogGame = null;
+        ProtonDialogGame = null;
         IsNameDialogOpen = false;
         _afterName = null;
         IsConfirmOpen = false;

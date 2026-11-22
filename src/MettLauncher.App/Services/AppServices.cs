@@ -4,6 +4,7 @@ using MettLauncher.Core.GitHub;
 using MettLauncher.Core.Install;
 using MettLauncher.Core.Launch;
 using MettLauncher.Core.News;
+using MettLauncher.Core.Proton;
 using MettLauncher.Core.Settings;
 using MettLauncher.Core.State;
 
@@ -22,7 +23,13 @@ public sealed class AppServices : IDisposable
             Settings.Current.CatalogBaseUrl is { } u && Uri.TryCreate(u, UriKind.Absolute, out var cu) ? cu : null);
         Releases = new ReleaseService(Http, Paths);
         News = new NewsService(Http, Paths);
-        Launcher = new GameLauncher(Library);
+        Proton = new ProtonManager(Http, Paths, Releases);
+        Umu = new UmuManager(Http, Paths, Releases);
+        ProtonRunner = new ProtonRunner(Paths, Proton, Umu, Library, () => Settings.Current.ProtonLog);
+        var native = new NativeRunner();
+        // Unter Linux laufen Windows-Spiele über Proton; nur Spiele mit "linux": "native" starten direkt.
+        Launcher = new GameLauncher(Library, runnerFor: game =>
+            OperatingSystem.IsLinux() && !game.RunsNativeOnLinux ? ProtonRunner : native);
         Installer = new InstallService(Http, Library, Settings, id => Launcher.IsRunning(id));
         Images = new ImageCache(Http, Paths);
         LauncherUpdates = new LauncherUpdateService();
@@ -31,6 +38,10 @@ public sealed class AppServices : IDisposable
     }
 
     public NetService Net { get; }
+    public ProtonManager Proton { get; }
+    public UmuManager Umu { get; }
+    public ProtonRunner ProtonRunner { get; }
+    public static bool IsLinux => OperatingSystem.IsLinux();
 
     public LauncherPaths Paths { get; }
     public HttpClient Http { get; }

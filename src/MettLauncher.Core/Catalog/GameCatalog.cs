@@ -31,4 +31,9 @@ public sealed record GameEntry
     public bool IncludePrereleases { get; init; }
     /// <summary>Spiel nutzt den Mehrspieler des Launchers (<c>mett-net</c>); zeigt „Mit Freunden spielen“.</summary>
     public bool Multiplayer { get; init; }
+    /// <summary>Eintrag in der umu-Datenbank (Proton-Fixes), z. B. <c>umu-12345</c>; ohne = <c>umu-default</c>.</summary>
+    public string? UmuId { get; init; }
+    /// <summary>Unter Linux: <c>proton</c> (Standard, Windows-Build über Proton) oder <c>native</c> (Linux-Build im Zip).</summary>
+    public string Linux { get; init; } = "proton";
+    public bool RunsNativeOnLinux => string.Equals(Linux, "native", StringComparison.OrdinalIgnoreCase);
 }

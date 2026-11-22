@@ -10,7 +10,7 @@
     <ApplicationIcon>..\..\assets\icon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <Version>0.2.1</Version>
+    <Version>0.3.0</Version>
     <Product>Mett Launcher</Product>
     <Company>Mett Gaming</Company>
     <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
@@ -32,13 +32,15 @@
 
   <!-- Peer-to-Peer-Netzdienst (Rust, native/mett-netd). Release-Build bevorzugt, sonst Debug. -->
   <PropertyGroup>
-    <MettNetdRelease>$(MSBuildThisFileDirectory)..\..\native\target\release\mett-netd.exe</MettNetdRelease>
-    <MettNetdDebug>$(MSBuildThisFileDirectory)..\..\native\target\debug\mett-netd.exe</MettNetdDebug>
+    <MettNetdExe Condition="$([MSBuild]::IsOSPlatform('Windows'))">mett-netd.exe</MettNetdExe>
+    <MettNetdExe Condition="'$(MettNetdExe)' == ''">mett-netd</MettNetdExe>
+    <MettNetdRelease>$(MSBuildThisFileDirectory)../../native/target/release/$(MettNetdExe)</MettNetdRelease>
+    <MettNetdDebug>$(MSBuildThisFileDirectory)../../native/target/debug/$(MettNetdExe)</MettNetdDebug>
     <MettNetdPath Condition="Exists('$(MettNetdRelease)')">$(MettNetdRelease)</MettNetdPath>
     <MettNetdPath Condition="'$(MettNetdPath)' == '' And Exists('$(MettNetdDebug)')">$(MettNetdDebug)</MettNetdPath>
   </PropertyGroup>
   <ItemGroup Condition="'$(MettNetdPath)' != ''">
-    <None Include="$(MettNetdPath)" Link="mett-netd.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(MettNetdPath)" Link="$(MettNetdExe)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

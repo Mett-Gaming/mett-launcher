@@ -79,6 +79,9 @@
                 <MenuItem Header="Lokalen Ordner öffnen" Command="{Binding OpenFolderCommand}" IsEnabled="{Binding HasFolder}" />
                 <MenuItem Header="Dateien überprüfen" Command="{Binding VerifyCommand}" IsEnabled="{Binding IsInstalled}" />
                 <MenuItem Header="Version wählen …" Command="{Binding ShowVersionsCommand}" />
+                <MenuItem Header="Proton-Version …" Command="{Binding ChooseProtonCommand}" IsVisible="{Binding UsesProton}" />
+                <MenuItem Header="Wine-Prefix öffnen" Command="{Binding OpenPrefixCommand}" IsVisible="{Binding UsesProton}" />
+                <MenuItem Header="Wine-Prefix zurücksetzen …" Command="{Binding AskResetPrefixCommand}" IsVisible="{Binding UsesProton}" />
                 <Separator />
                 <MenuItem Header="Automatisch aktualisieren" ToggleType="CheckBox" IsChecked="{Binding AutoUpdate, Mode=OneWay}"
                           Command="{Binding ToggleAutoUpdateCommand}" IsEnabled="{Binding IsInstalled}" />
@@ -149,7 +152,7 @@
 
         <StackPanel Grid.Column="1" Spacing="10">
           <Border Classes="sectionhead"><TextBlock Classes="overline" Text="INFO" /></Border>
-          <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
+          <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
             <TextBlock Classes="caption" Text="Entwickler" />
             <TextBlock Grid.Column="1" Classes="caption" Foreground="{StaticResource TextPrimary}" Text="{Binding Developer}" />
             <TextBlock Grid.Row="1" Classes="caption" Text="Erschienen" />
@@ -161,6 +164,9 @@
             <TextBlock Grid.Row="4" Classes="caption" Text="Ordner" IsVisible="{Binding HasFolder}" />
             <TextBlock Grid.Row="4" Grid.Column="1" Classes="caption" Foreground="{StaticResource TextPrimary}" Text="{Binding FolderText}"
                        IsVisible="{Binding HasFolder}" TextTrimming="PrefixCharacterEllipsis" ToolTip.Tip="{Binding FolderText}" />
+            <TextBlock Grid.Row="5" Classes="caption" Text="Läuft über" IsVisible="{Binding ShowRunner}" />
+            <TextBlock Grid.Row="5" Grid.Column="1" Classes="caption" Foreground="{StaticResource TextPrimary}" Text="{Binding RunnerText}"
+                       IsVisible="{Binding ShowRunner}" TextWrapping="Wrap" />
           </Grid>
           <StackPanel Spacing="6" Margin="0,8,0,0">
             <Button Classes="link" Content="GitHub-Repository" Command="{Binding OpenRepoCommand}" />

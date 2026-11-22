@@ -14,6 +14,13 @@ public sealed record LauncherPaths(string Root)
     public string ReleaseCacheDir => Path.Combine(CacheDir, "releases");
     public string NewsCacheFile => Path.Combine(CacheDir, "news.json");
     public string ImageCacheDir => Path.Combine(CacheDir, "images");
+    /// <summary>Vom Launcher verwaltete Proton-Versionen (Linux).</summary>
+    public string ProtonDir => Path.Combine(Root, "proton");
+    /// <summary>Wine-Prefixe pro Spiel (Linux).</summary>
+    public string PrefixDir => Path.Combine(Root, "prefixes");
+    /// <summary>Hilfsprogramme wie umu-launcher (Linux).</summary>
+    public string ToolsDir => Path.Combine(Root, "tools");
+    public string LogDir => Path.Combine(Root, "logs");
     public string LibraryFile => Path.Combine(Root, "library.json");
     public string SettingsFile => Path.Combine(Root, "settings.json");
     public string DefaultGamesDir => Path.Combine(Root, "games");

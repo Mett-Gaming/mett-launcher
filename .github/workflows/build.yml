@@ -1,6 +1,9 @@
-# Baut und testet den Mett Launcher bei jedem Push/PR.
-# Ein Tag "v*" (z. B. v0.1.0) erzeugt zusätzlich ein GitHub-Release mit Velopack-Paketen
-# (Setup.exe, Portable-Zip, Delta-Updates) – daraus aktualisieren sich installierte Launcher selbst.
+# Baut und testet den Mett Launcher bei jedem Push/PR – für Windows und Linux.
+# Ein Tag "v*" (z. B. v0.3.0) erzeugt zusätzlich ein GitHub-Release mit Velopack-Paketen:
+#   Windows: Setup.exe, Portable-Zip, Delta-Updates (Kanal "win")
+#   Linux:   MettLauncher.AppImage, Delta-Updates (Kanal "linux")
+# Installierte Launcher aktualisieren sich daraus selbst.
+# Der Job "proton-e2e" startet ein echtes Windows-Programm über GE-Proton (manuell oder bei Tags).
 name: Build
 
 on:
@@ -9,12 +12,17 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      proton_e2e:
+        description: "Proton-Ende-zu-Ende-Test ausführen"
+        type: boolean
+        default: true
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +63,7 @@ jobs:
       - name: Artefakt hochladen
         uses: actions/upload-artifact@v4
         with:
-          name: MettLauncher-${{ steps.ver.outputs.version }}
+          name: MettLauncher-win-${{ steps.ver.outputs.version }}
           path: publish
 
       - name: Release mit Velopack (nur bei Tags v*)
@@ -66,9 +74,137 @@ jobs:
         run: |
           dotnet tool install -g vpk --version 1.2.161
           $repo = "https://github.com/${{ github.repository }}"
-          # Vorherige Releases holen, damit Delta-Pakete entstehen
-          vpk download github --repoUrl $repo --token $env:GH_TOKEN --outputDir dist
+          vpk download github --repoUrl $repo --token $env:GH_TOKEN --outputDir dist --channel win
           vpk pack --packId MettLauncher --packVersion ${{ steps.ver.outputs.version }} --packDir publish --mainExe MettLauncher.exe `
-            --packTitle "Mett Launcher" --packAuthors "Mett Gaming" --icon assets/icon.ico --outputDir dist
-          vpk upload github --repoUrl $repo --token $env:GH_TOKEN --outputDir dist --publish `
+            --packTitle "Mett Launcher" --packAuthors "Mett Gaming" --icon assets/icon.ico --outputDir dist --channel win
+          vpk upload github --repoUrl $repo --token $env:GH_TOKEN --outputDir dist --channel win --publish --merge `
             --releaseName "Mett Launcher ${{ github.ref_name }}" --tag ${{ github.ref_name }}
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Version bestimmen
+        id: ver
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then v="${GITHUB_REF_NAME#v}"; else v="0.0.0-ci.${{ github.run_number }}"; fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native
+
+      - name: Netzdienst (Rust) testen und bauen
+        working-directory: native
+        run: |
+          cargo test --workspace
+          cargo build --release -p mett-netd
+
+      - name: Tests
+        run: dotnet test -c Release
+        env:
+          METT_SKIP_INTEGRATION: "1"
+
+      - name: Publish
+        run: dotnet publish src/MettLauncher.App -c Release -r linux-x64 --self-contained -o publish -p:Version=${{ steps.ver.outputs.version }}
+
+      - name: Starttest (xvfb)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb > /dev/null
+          test -x publish/mett-netd
+          export HOME_TMP=$(mktemp -d); export XDG_DATA_HOME="$HOME_TMP"
+          xvfb-run -a ./publish/MettLauncher > launcher.log 2>&1 &
+          for i in $(seq 1 30); do pgrep -f publish/mett-netd > /dev/null && break; sleep 1; done
+          pgrep -f publish/MettLauncher > /dev/null || { echo "Launcher läuft nicht"; cat launcher.log; exit 1; }
+          pgrep -f publish/mett-netd > /dev/null || { echo "mett-netd wurde nicht gestartet"; cat launcher.log; exit 1; }
+          pkill -f publish/MettLauncher; sleep 3
+          ! pgrep -f publish/mett-netd > /dev/null || { echo "mett-netd läuft nach Launcher-Ende weiter"; exit 1; }
+          echo "Starttest ok"
+
+      - name: Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: MettLauncher-linux-${{ steps.ver.outputs.version }}
+          path: publish
+
+      - name: Release mit Velopack (nur bei Tags v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dotnet tool install -g vpk --version 1.2.161
+          repo="https://github.com/${{ github.repository }}"
+          vpk download github --repoUrl "$repo" --token "$GH_TOKEN" --outputDir dist --channel linux
+          vpk pack --packId MettLauncher --packVersion ${{ steps.ver.outputs.version }} --packDir publish --mainExe MettLauncher \
+            --packTitle "Mett Launcher" --packAuthors "Mett Gaming" --icon assets/icon.png --categories Game --outputDir dist --channel linux
+          vpk upload github --repoUrl "$repo" --token "$GH_TOKEN" --outputDir dist --channel linux --publish --merge \
+            --releaseName "Mett Launcher ${{ github.ref_name }}" --tag ${{ github.ref_name }}
+
+  # Echter Proton-Lauf: GE-Proton + umu laden, Windows-Chat (mett-net) zweimal über Proton starten,
+  # Host/Join über zwei native mett-netd. Dauert beim ersten Mal lange (Downloads ~1,2 GB), danach gecacht.
+  proton-e2e:
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.proton_e2e)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-gnu
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native
+
+      - name: Werkzeuge
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb mingw-w64 python3 > /dev/null
+
+      - name: mett-netd (Linux) und Chat-Beispiel (Windows) bauen
+        working-directory: native
+        run: |
+          cargo build --release -p mett-netd
+          cargo build --release -p mett-net --example chat --target x86_64-pc-windows-gnu
+
+      - name: Proton- und umu-Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/mett-e2e/proton
+            ~/.cache/mett-e2e/tools
+            ~/.local/share/umu
+          key: proton-e2e-${{ runner.os }}-v1
+
+      - name: Proton-Ende-zu-Ende-Test
+        env:
+          METT_PROTON_E2E: "1"
+          METT_E2E_ROOT: ${{ github.workspace }}/../mett-e2e-root
+          METT_E2E_NETD: ${{ github.workspace }}/native/target/release/mett-netd
+          METT_E2E_CHAT_EXE: ${{ github.workspace }}/native/target/x86_64-pc-windows-gnu/release/examples/chat.exe
+        run: |
+          # Gecachte Downloads in den Arbeitsordner des Tests legen
+          mkdir -p "$METT_E2E_ROOT" ~/.cache/mett-e2e/proton ~/.cache/mett-e2e/tools
+          ln -sfn ~/.cache/mett-e2e/proton "$METT_E2E_ROOT/proton"
+          ln -sfn ~/.cache/mett-e2e/tools "$METT_E2E_ROOT/tools"
+          xvfb-run -a dotnet test tests/MettLauncher.Core.Tests -c Release --filter "FullyQualifiedName~ProtonE2E" --logger "console;verbosity=detailed"
+
+      - name: Proton-Logs sichern
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: proton-e2e-logs
+          path: ${{ github.workspace }}/../mett-e2e-root/logs
+          if-no-files-found: ignore

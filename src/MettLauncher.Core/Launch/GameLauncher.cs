@@ -89,13 +89,27 @@ public sealed class GameLauncher
     private readonly LibraryStore _library;
     private readonly IProcessStarter _starter;
     private readonly TimeProvider _time;
+    private readonly Func<GameEntry, IGameRunner> _runnerFor;
     private readonly ConcurrentDictionary<string, GameSession?> _running = new(StringComparer.OrdinalIgnoreCase);
 
-    public GameLauncher(LibraryStore library, IProcessStarter? starter = null, TimeProvider? time = null)
+    /// <param name="runnerFor">Wählt pro Spiel den Start-Weg (nativ oder Proton). Standard: immer nativ.</param>
+    public GameLauncher(LibraryStore library, IProcessStarter? starter = null, TimeProvider? time = null,
+        Func<GameEntry, IGameRunner>? runnerFor = null)
     {
         _library = library;
         _starter = starter ?? new SystemProcessStarter();
         _time = time ?? TimeProvider.System;
+        var native = new NativeRunner();
+        _runnerFor = runnerFor ?? (_ => native);
+    }
+
+    public IGameRunner RunnerFor(GameEntry game) => _runnerFor(game);
+
+    /// <summary>Beendet ein laufendes Spiel über seinen Runner (unter Proton inkl. Wine-Prozessen).</summary>
+    public async Task StopAsync(GameEntry game)
+    {
+        if (GetSession(game.Id) is { } session)
+            await _runnerFor(game).StopAsync(game, session).ConfigureAwait(false);
     }
 
     public event EventHandler<GameSession>? GameStarted;
@@ -120,15 +134,9 @@ public sealed class GameLauncher
         DateTimeOffset startedAt;
         try
         {
-            if (_starter.IsRunning(exe)) throw new GameAlreadyRunningException(game.Name);
-            var psi = new ProcessStartInfo(exe)
-            {
-                WorkingDirectory = installDir,
-                UseShellExecute = false,
-            };
-            foreach (var arg in game.Args) psi.ArgumentList.Add(arg);
-            if (environment is not null)
-                foreach (var (k, v) in environment) psi.Environment[k] = v;
+            var runner = _runnerFor(game);
+            if (runner.DetectsExternalInstances && _starter.IsRunning(exe)) throw new GameAlreadyRunningException(game.Name);
+            var psi = runner.CreateStartInfo(game, installDir, exe, environment);
             startedAt = _time.GetUtcNow();
             process = _starter.Start(psi);
         }

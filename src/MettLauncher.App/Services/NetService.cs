@@ -24,13 +24,13 @@ public sealed class NetService : IDisposable
     public string? Token { get; private set; }
     public string? StartError { get; private set; }
 
-    public static string ExePath => Path.Combine(AppContext.BaseDirectory, "mett-netd.exe");
+    public static string ExePath => Path.Combine(AppContext.BaseDirectory, OperatingSystem.IsWindows() ? "mett-netd.exe" : "mett-netd");
 
     public void Start(LauncherPaths paths, string? displayName)
     {
         if (!File.Exists(ExePath))
         {
-            StartError = "Netzdienst fehlt (mett-netd.exe).";
+            StartError = $"Netzdienst fehlt ({Path.GetFileName(ExePath)}).";
             return;
         }
         try

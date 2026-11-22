@@ -29,7 +29,7 @@
           <Button Classes="nav" Classes.active="{Binding IsSettings}" Content="EINSTELLUNGEN" Command="{Binding ShowSettingsCommand}" />
         </StackPanel>
         <Border Grid.Column="2" x:Name="DragArea" Background="Transparent" chrome:WindowDecorationProperties.ElementRole="TitleBar" />
-        <StackPanel Grid.Column="3" Orientation="Horizontal">
+        <StackPanel Grid.Column="3" Orientation="Horizontal" x:Name="ChromeButtons">
           <Button Classes="chrome" x:Name="MinButton" chrome:WindowDecorationProperties.ElementRole="MinimizeButton" ToolTip.Tip="Minimieren" AutomationProperties.Name="Minimieren">
             <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconMinus}" />
           </Button>
@@ -175,6 +175,7 @@
           <Button Classes="side" Classes.active="{Binding IsCatLibrary}" Content="Bibliothek" Command="{Binding ShowSettingsLibraryCommand}" />
           <Button Classes="side" Classes.active="{Binding IsCatUpdates}" Content="Downloads &amp; Updates" Command="{Binding ShowSettingsUpdatesCommand}" />
           <Button Classes="side" Classes.active="{Binding IsCatMultiplayer}" Content="Mehrspieler" Command="{Binding ShowSettingsMultiplayerCommand}" />
+          <Button Classes="side" Classes.active="{Binding IsCatProton}" Content="Proton" Command="{Binding ShowSettingsProtonCommand}" IsVisible="{Binding IsLinux}" />
           <Button Classes="side" Classes.active="{Binding IsCatAbout}" Content="Über" Command="{Binding ShowSettingsAboutCommand}" />
         </StackPanel>
       </Border>
@@ -242,7 +243,44 @@
               </Grid>
             </Border>
             <TextBlock Classes="caption" Margin="0,12,0,0" TextWrapping="Wrap"
-                       Text="Ohne Account und ohne eigenen Server: Spiele verbinden sich direkt (Peer-to-Peer, verschlüsselt). Klappt das wegen eines Routers nicht, läuft der Verkehr verschlüsselt über ein Relay von n0 (iroh). Fragt Windows nach Netzwerkzugriff für mett-netd, erlaube ihn für private Netzwerke, damit direkte Verbindungen klappen." />
+                       Text="{Binding MultiplayerHint}" />
+          </StackPanel>
+          <!-- Proton (nur Linux) -->
+          <StackPanel IsVisible="{Binding IsCatProton}">
+            <TextBlock Classes="h1" Text="Proton" Margin="0,0,0,8" />
+            <Border Classes="settingrow">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="GE-Proton (vom Launcher verwaltet)" FontWeight="SemiBold" />
+                  <TextBlock Classes="caption" Text="{Binding ProtonInfo}" TextWrapping="Wrap" />
+                  <TextBlock Classes="caption" Text="{Binding ProtonUpdateStatus}" TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="secondary" Content="Nach neuer Version suchen" Command="{Binding UpdateProtonCommand}" VerticalAlignment="Center" />
+              </Grid>
+            </Border>
+            <Border Classes="settingrow">
+              <StackPanel Spacing="2">
+                <TextBlock Text="Proton aus Steam" FontWeight="SemiBold" />
+                <TextBlock Classes="caption" Text="{Binding SteamProtonInfo}" TextWrapping="Wrap" />
+                <TextBlock Classes="caption" Text="Pro Spiel wählbar über das Zahnrad → „Proton-Version …“." />
+              </StackPanel>
+            </Border>
+            <Border Classes="settingrow">
+              <StackPanel Spacing="2">
+                <TextBlock Text="umu-launcher" FontWeight="SemiBold" />
+                <TextBlock Classes="caption" Text="{Binding UmuInfo}" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+            <Border Classes="settingrow">
+              <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="Proton-Log schreiben" FontWeight="SemiBold" />
+                  <TextBlock Classes="caption" Text="Für die Fehlersuche, wenn ein Spiel nicht startet. Die Logs landen im Launcher-Ordner unter logs." TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" Content="Logs öffnen" Command="{Binding OpenProtonLogsCommand}" VerticalAlignment="Center" />
+                <ToggleSwitch Grid.Column="2" IsChecked="{Binding ProtonLog}" />
+              </Grid>
+            </Border>
           </StackPanel>
           <!-- Über -->
           <StackPanel IsVisible="{Binding IsCatAbout}">
@@ -275,7 +313,13 @@
     <!-- ===== Download-Leiste ===== -->
     <Border Grid.Row="3" Background="{StaticResource BgSidebar}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,1,0,0">
       <Panel>
-        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center" IsVisible="{Binding !HasDownload}">
+        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center" IsVisible="{Binding HasToolDownload}">
+          <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconDownload}" Foreground="{StaticResource AccentHover}" VerticalAlignment="Center" />
+          <TextBlock Classes="caption" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Text="{Binding ToolDownloadText}" />
+          <TextBlock Classes="caption" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Text="{Binding ToolDownloadDetail}" />
+          <ProgressBar Width="160" Value="{Binding ToolDownloadProgress}" Maximum="1" VerticalAlignment="Center" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center" IsVisible="{Binding ShowIdleDownloads}">
           <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconDownload}" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" />
           <TextBlock Classes="caption" Text="{Binding DownloadIdleText}" VerticalAlignment="Center" />
         </StackPanel>
@@ -363,6 +407,30 @@
             <Button Classes="ghost" Content="Abbrechen" Command="{Binding CloseDialogsCommand}" />
             <Button Classes="primary" Content="Beitreten" Command="{Binding ConfirmJoinCommand}" />
           </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Proton-Version wählen -->
+      <Border Classes="dialog" Width="520" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsProtonDialogOpen}">
+        <StackPanel Spacing="12">
+          <TextBlock Classes="h1" Text="{Binding ProtonDialogGame.Name, StringFormat='{}{0} – Proton-Version', FallbackValue=''}" />
+          <TextBlock Classes="body" Text="Standard ist die neueste GE-Proton. Eine feste Version hilft, wenn ein Spiel mit einer neueren Version Probleme hat." />
+          <ItemsControl ItemsSource="{Binding ProtonOptions}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Spacing="4" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:ProtonOptionViewModel">
+                <Button Classes="side" Classes.active="{Binding IsSelected}" Padding="12,8" Command="{Binding SelectCommand}">
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconCheck}" IsVisible="{Binding IsSelected}" Foreground="{StaticResource AccentHover}" />
+                    <TextBlock Text="{Binding Display}" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Button Classes="secondary" Content="Schließen" HorizontalAlignment="Right" Command="{Binding CloseDialogsCommand}" />
         </StackPanel>
       </Border>
 

@@ -54,3 +54,12 @@ public sealed class VersionItemViewModel(GameViewModel owner, ResolvedRelease re
     public IRelayCommand TogglePinCommand => new RelayCommand(owner.TogglePin);
     public string PinLabel => IsPinned ? "Lösen" : "Festpinnen";
 }
+
+/// <summary>Auswahl im Dialog „Proton-Version“.</summary>
+public sealed class ProtonOptionViewModel(MainViewModel main, string? name, string display, bool isSelected)
+{
+    public string? Name { get; } = name;
+    public string Display { get; } = display;
+    public bool IsSelected { get; } = isSelected;
+    public IRelayCommand SelectCommand => new RelayCommand(() => main.SelectProton(Name));
+}

@@ -229,10 +229,10 @@ public sealed partial class GameViewModel : ObservableObject
                 else _main.ShowError($"Für {Name} gibt es noch kein installierbares Release.");
                 break;
             case GamePhase.Ready:
-                Play();
+                await PlayAsync();
                 break;
             case GamePhase.Running:
-                Stop();
+                await _s.Launcher.StopAsync(Entry);
                 break;
         }
     }
@@ -292,7 +292,7 @@ public sealed partial class GameViewModel : ObservableObject
         if (Phase != GamePhase.Ready) { _main.ShowError($"{Name} muss zuerst installiert bzw. aktualisiert werden."); return; }
         var env = _s.Net.GameEnvironment(Id, action, code);
         if (env is null) { _main.ShowError(_s.Net.StartError ?? "Der Mehrspieler-Dienst ist noch nicht bereit."); return; }
-        Play(env);
+        _ = PlayAsync(env);
     }
 
     [RelayCommand]
@@ -301,20 +301,23 @@ public sealed partial class GameViewModel : ObservableObject
         if (SessionCode is not null) await _main.CopyAsync(SessionCode);
     }
 
-    private void Play(IReadOnlyDictionary<string, string>? env = null)
+    private async Task PlayAsync(IReadOnlyDictionary<string, string>? env = null)
     {
         try
         {
+            // Unter Linux: Proton/umu beim ersten Start einrichten (Download mit Fortschritt unten).
+            if (UsesProton && !await _main.EnsureProtonAsync()) return;
             env ??= IsMultiplayer ? _s.Net.GameEnvironment(Id) : null;
             var session = _s.Launcher.Launch(Entry, env);
             Phase = GamePhase.Running;
             LastPlayedText = "Jetzt";
-            _ = session.Exited.ContinueWith(_ => Dispatcher.UIThread.Post(() =>
+            _ = session.Exited.ContinueWith(t => Dispatcher.UIThread.Post(() =>
             {
                 SessionCode = null;
                 SessionText = null;
                 Phase = GamePhase.Ready;
                 Recompute();
+                if (t.IsCompletedSuccessfully) ReportSuspiciousExit(t.Result);
             }), TaskScheduler.Default);
         }
         catch (Exception ex)
@@ -324,20 +327,49 @@ public sealed partial class GameViewModel : ObservableObject
         }
     }
 
-    private void Stop()
+    /// <summary>Spiel nach wenigen Sekunden mit Fehlercode beendet -> wahrscheinlich Startproblem.</summary>
+    private void ReportSuspiciousExit(MettLauncher.Core.Launch.GameExitInfo exit)
     {
-        var session = _s.Launcher.GetSession(Id);
-        if (session is null) return;
-        try
-        {
-            using var p = Process.GetProcessById(session.ProcessId);
-            if (!p.CloseMainWindow() || !p.WaitForExit(3000)) p.Kill(entireProcessTree: true);
-        }
-        catch (Exception)
-        {
-            // Prozess schon weg
-        }
+        if (exit.Duration > TimeSpan.FromSeconds(10) || exit.ExitCode is null or 0) return;
+        var hint = UsesProton
+            ? " Unter Einstellungen → Proton kannst du das Proton-Log einschalten oder eine andere Proton-Version wählen."
+            : "";
+        _main.ShowError($"{Name} wurde nach {exit.Duration.TotalSeconds:0} s mit Fehlercode {exit.ExitCode} beendet.{hint}");
     }
+
+    // ---- Linux / Proton ----
+    public bool UsesProton => _s.Launcher.RunnerFor(Entry) is MettLauncher.Core.Proton.ProtonRunner;
+    public string RunnerText => _s.Launcher.RunnerFor(Entry).Describe(Entry);
+    public bool ShowRunner => AppServices.IsLinux;
+
+    [RelayCommand]
+    private void ChooseProton() => _main.OpenProtonDialog(this);
+
+    [RelayCommand]
+    private void OpenPrefix()
+    {
+        var dir = _s.ProtonRunner.PrefixFor(Id);
+        Directory.CreateDirectory(dir);
+        Shell.OpenFolder(dir);
+    }
+
+    [RelayCommand]
+    private void AskResetPrefix()
+    {
+        if (Phase == GamePhase.Running) { _main.ShowError($"{Name} läuft gerade."); return; }
+        _main.Confirm($"Wine-Prefix von {Name} zurücksetzen?",
+            "Der Prefix wird gelöscht und beim nächsten Start neu angelegt. Spielstände, die das Spiel im Prefix speichert, gehen dabei verloren.",
+            "Zurücksetzen",
+            () => { _s.ProtonRunner.ResetPrefix(Entry); return Task.CompletedTask; });
+    }
+
+    public void SetProtonVersion(string? name)
+    {
+        _s.Library.UpdateGame(Id, g => g.ProtonVersion = name);
+        OnPropertyChanged(nameof(RunnerText));
+    }
+
+    public string? ProtonVersion => _s.Library.GetGame(Id)?.ProtonVersion;
 
     public async Task InstallVersionAsync(ResolvedRelease release)
     {

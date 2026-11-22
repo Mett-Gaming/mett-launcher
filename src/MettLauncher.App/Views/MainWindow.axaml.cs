@@ -12,6 +12,14 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        if (OperatingSystem.IsLinux())
+        {
+            // X11/Wayland verhalten sich bei eigener Titelleiste uneinheitlich -> Systemleiste nutzen.
+            WindowDecorations = WindowDecorations.Full;
+            ExtendClientAreaToDecorationsHint = false;
+            ChromeButtons.IsVisible = false;
+            Icon = new WindowIcon(Avalonia.Platform.AssetLoader.Open(new Uri("avares://MettLauncher/Assets/icon.png")));
+        }
         DragArea.PointerPressed += OnDragAreaPressed;
         MinButton.Click += (_, _) => WindowState = WindowState.Minimized;
         MaxButton.Click += (_, _) => ToggleMaximize();
@@ -32,6 +40,7 @@ public partial class MainWindow : Window
 
     private void OnDragAreaPressed(object? sender, PointerPressedEventArgs e)
     {
+        if (OperatingSystem.IsLinux()) return; // Systemleiste übernimmt das Ziehen
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         if (e.ClickCount == 2) ToggleMaximize();
         else BeginMoveDrag(e);

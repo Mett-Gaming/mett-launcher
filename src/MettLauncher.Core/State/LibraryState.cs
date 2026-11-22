@@ -36,6 +36,8 @@ public sealed class GameState
 
     /// <summary>Festgepinnter Tag – solange gesetzt, gibt es kein Auto-Update.</summary>
     public string? PinnedTag { get; set; }
+    /// <summary>Linux: gewählte Proton-Version (Ordnername); <c>null</c> = neueste vom Launcher verwaltete GE-Proton.</summary>
+    public string? ProtonVersion { get; set; }
 
     public long TotalPlaySeconds { get; set; }
     public DateTimeOffset? LastPlayed { get; set; }

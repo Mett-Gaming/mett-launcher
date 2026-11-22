@@ -12,8 +12,10 @@ public sealed record LauncherSettings
     public bool IncludePrereleases { get; init; }
     /// <summary>Alternative Katalog-Basis-URL (z. B. zum Testen); <c>null</c> = Standard.</summary>
     public string? CatalogBaseUrl { get; init; }
-    /// <summary>Name, den Mitspieler im Mehrspieler sehen; leer = automatisch (Spieler-XXXX).</summary>
+    /// <summary>Name, den Mitspieler sehen; Pflicht für Hosten/Beitreten (2–24 Zeichen).</summary>
     public string? DisplayName { get; init; }
+    /// <summary>Linux: Proton schreibt ein ausführliches Log nach <c>logs\</c> (<c>PROTON_LOG=1</c>).</summary>
+    public bool ProtonLog { get; init; }
 }
 
 /// <summary>Lädt/speichert <c>settings.json</c>.</summary>
