@@ -58,6 +58,20 @@
             <TextBlock Text="{Binding PlaytimeText}" FontWeight="Medium" Foreground="{StaticResource TextSecondary}" />
           </StackPanel>
 
+          <Button Grid.Column="3" Classes="secondary" HorizontalAlignment="Right" Height="40" IsVisible="{Binding IsMultiplayer}"
+                  AutomationProperties.Name="Mit Freunden spielen">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <c:LucideIcon Width="16" Height="16" Data="{StaticResource IconUsers}" />
+              <TextBlock Text="Mit Freunden spielen" VerticalAlignment="Center" />
+            </StackPanel>
+            <Button.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedRight">
+                <MenuItem Header="Spiel hosten" Command="{Binding HostGameCommand}" />
+                <MenuItem Header="Beitreten mit Code …" Command="{Binding JoinGameCommand}" />
+              </MenuFlyout>
+            </Button.Flyout>
+          </Button>
+
           <Button Grid.Column="4" Classes="icon" ToolTip.Tip="Verwalten" AutomationProperties.Name="Verwalten">
             <c:LucideIcon Width="18" Height="18" Data="{StaticResource IconSettings}" />
             <Button.Flyout>
@@ -75,6 +89,24 @@
           </Button>
           <Button Grid.Column="5" Classes="icon" ToolTip.Tip="Auf GitHub ansehen" AutomationProperties.Name="Auf GitHub ansehen" Command="{Binding OpenRepoCommand}">
             <c:LucideIcon Width="18" Height="18" Data="{StaticResource IconInfo}" />
+          </Button>
+        </Grid>
+      </Border>
+
+      <!-- Laufende Mehrspieler-Sitzung -->
+      <Border Background="#23261A" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,0,0,1" Padding="32,10"
+              IsVisible="{Binding HasSession}">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+          <c:LucideIcon Width="16" Height="16" Data="{StaticResource IconUsers}" Foreground="{StaticResource AccentHover}" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Text="{Binding SessionText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="2" Classes="mono" Text="{Binding SessionCodeDisplay}" Foreground="{StaticResource TextSecondary}"
+                     VerticalAlignment="Center" IsVisible="{Binding IsHosting}" ToolTip.Tip="{Binding SessionCode}" />
+          <Button Grid.Column="3" Classes="secondary" IsVisible="{Binding IsHosting}" Command="{Binding CopyCodeCommand}"
+                  AutomationProperties.Name="Code kopieren">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconCopy}" />
+              <TextBlock Text="Code kopieren" VerticalAlignment="Center" />
+            </StackPanel>
           </Button>
         </Grid>
       </Border>

@@ -29,4 +29,6 @@ public sealed record GameEntry
     /// <summary>Relative Pfade im Installordner, die Updates überleben.</summary>
     public IReadOnlyList<string> Preserve { get; init; } = [];
     public bool IncludePrereleases { get; init; }
+    /// <summary>Spiel nutzt den Mehrspieler des Launchers (<c>mett-net</c>); zeigt „Mit Freunden spielen“.</summary>
+    public bool Multiplayer { get; init; }
 }

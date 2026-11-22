@@ -237,15 +237,82 @@ public sealed partial class GameViewModel : ObservableObject
         }
     }
 
-    private void Play()
+    // ---- Mehrspieler ----
+    public bool IsMultiplayer => Entry.Multiplayer;
+    [ObservableProperty] public partial string? SessionCode { get; set; }
+    [ObservableProperty] public partial int PeerCount { get; set; }
+    [ObservableProperty] public partial string? SessionText { get; set; }
+    public bool HasSession => SessionText is not null;
+    public bool IsHosting => SessionCode is not null;
+    public string SessionCodeDisplay => SessionCode is null ? "" : string.Join(" ", Enumerable.Range(0, (SessionCode.Length + 7) / 8)
+        .Select(i => SessionCode.Substring(i * 8, Math.Min(8, SessionCode.Length - i * 8))).Take(4)) + (SessionCode.Length > 32 ? " …" : "");
+    partial void OnSessionTextChanged(string? value) => OnPropertyChanged(nameof(HasSession));
+    partial void OnSessionCodeChanged(string? value) { OnPropertyChanged(nameof(IsHosting)); OnPropertyChanged(nameof(SessionCodeDisplay)); }
+
+    /// <summary>Vom Netzdienst gemeldete Sitzungsereignisse.</summary>
+    public void OnNetEvent(string ev, System.Text.Json.Nodes.JsonObject data)
+    {
+        switch (ev)
+        {
+            case "hosted":
+                SessionCode = (string?)data["code"];
+                PeerCount = 0;
+                SessionText = "Du hostest · noch keine Mitspieler";
+                break;
+            case "peers":
+                PeerCount = (int?)data["count"] ?? 0;
+                SessionText = PeerCount switch
+                {
+                    0 => "Du hostest · noch keine Mitspieler",
+                    1 => "Du hostest · 1 Mitspieler",
+                    var n => $"Du hostest · {n} Mitspieler",
+                };
+                break;
+            case "joined":
+                SessionCode = null;
+                SessionText = $"Verbunden mit {(string?)data["host"]}";
+                break;
+            case "ended":
+                SessionCode = null;
+                SessionText = null;
+                PeerCount = 0;
+                break;
+        }
+    }
+
+    [RelayCommand]
+    private void HostGame() => StartMultiplayer("host", null);
+
+    [RelayCommand]
+    private void JoinGame() => _main.OpenJoinDialog(this);
+
+    public void StartMultiplayer(string action, string? code)
+    {
+        if (Phase == GamePhase.Running) { _main.ShowError($"{Name} läuft bereits. Hosten/Beitreten bitte im Spiel oder nach dem Beenden."); return; }
+        if (Phase != GamePhase.Ready) { _main.ShowError($"{Name} muss zuerst installiert bzw. aktualisiert werden."); return; }
+        var env = _s.Net.GameEnvironment(Id, action, code);
+        if (env is null) { _main.ShowError(_s.Net.StartError ?? "Der Mehrspieler-Dienst ist noch nicht bereit."); return; }
+        Play(env);
+    }
+
+    [RelayCommand]
+    private async Task CopyCodeAsync()
+    {
+        if (SessionCode is not null) await _main.CopyAsync(SessionCode);
+    }
+
+    private void Play(IReadOnlyDictionary<string, string>? env = null)
     {
         try
         {
-            var session = _s.Launcher.Launch(Entry);
+            env ??= IsMultiplayer ? _s.Net.GameEnvironment(Id) : null;
+            var session = _s.Launcher.Launch(Entry, env);
             Phase = GamePhase.Running;
             LastPlayedText = "Jetzt";
             _ = session.Exited.ContinueWith(_ => Dispatcher.UIThread.Post(() =>
             {
+                SessionCode = null;
+                SessionText = null;
                 Phase = GamePhase.Ready;
                 Recompute();
             }), TaskScheduler.Default);

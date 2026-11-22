@@ -56,6 +56,20 @@ public class GameLauncherTests
     }
 
     [Fact]
+    public void Passes_multiplayer_environment_to_the_game()
+    {
+        using var f = new Fixture();
+        f.Launcher.Launch(TestData.Kasse0(), new Dictionary<string, string>
+        {
+            ["METT_NET_ADDR"] = "127.0.0.1:1234",
+            ["METT_NET_ACTION"] = "host",
+        });
+        var psi = Assert.Single(f.Starter.Started);
+        Assert.Equal("127.0.0.1:1234", psi.Environment["METT_NET_ADDR"]);
+        Assert.Equal("host", psi.Environment["METT_NET_ACTION"]);
+    }
+
+    [Fact]
     public async Task Starts_in_install_dir_and_accumulates_playtime()
     {
         using var f = new Fixture();

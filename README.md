@@ -23,6 +23,7 @@ installierte Spiele lassen sich auch offline starten.
 - `src/MettLauncher.Core` – UI-freie Logik: Katalog, News, Releases (ETag-Cache), Installation (Download → Prüfsumme →
   Staging → atomarer Tausch), Spielstart mit Spielzeit, Bibliotheks-State.
 - `src/MettLauncher.App` – Avalonia-12-Oberfläche (MVVM, CommunityToolkit.Mvvm), Self-Update über Velopack.
+- `native/` – Mehrspieler: Netzdienst `mett-netd` (Rust, iroh) und Spiele-SDK `mett-net`, siehe [native/README.md](native/README.md).
 - `tests/MettLauncher.Core.Tests` – xUnit. Echter KASSE-0-Download nur mit `METT_INTEGRATION_DOWNLOAD=1`.
 - Design: Figma-Datei „Mett Launcher“ (Tokens, Komponenten, Screens).
 

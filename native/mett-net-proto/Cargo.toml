@@ -1,0 +1,11 @@
+[package]
+name = "mett-net-proto"
+description = "Rahmenprotokoll zwischen Spiel und Mett-Launcher-Netzdienst"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true

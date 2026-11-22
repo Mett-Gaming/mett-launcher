@@ -10,7 +10,7 @@ using MettLauncher.Core.News;
 namespace MettLauncher.App.ViewModels;
 
 public enum Section { Library, News, Settings }
-public enum SettingsCategory { Library, Updates, About }
+public enum SettingsCategory { Library, Updates, Multiplayer, About }
 
 public sealed partial class MainViewModel : ObservableObject
 {
@@ -26,6 +26,78 @@ public sealed partial class MainViewModel : ObservableObject
         IncludePrereleases = _s.Settings.Current.IncludePrereleases;
         LauncherVersion = _s.LauncherUpdates.CurrentVersion;
         _s.Launcher.GameExited += (_, _) => Dispatcher.UIThread.Post(() => { foreach (var g in Games) g.Recompute(); });
+        DisplayName = _s.Settings.Current.DisplayName ?? "";
+        _s.Net.EventReceived += ev => Dispatcher.UIThread.Post(() => OnNetEvent(ev));
+        UpdateNetStatus();
+    }
+
+    // ================= Mehrspieler =================
+
+    [ObservableProperty] public partial string DisplayName { get; set; }
+    [ObservableProperty] public partial string NetStatus { get; set; } = "";
+    [ObservableProperty] public partial GameViewModel? JoinDialogGame { get; set; }
+    [ObservableProperty] public partial string JoinCode { get; set; } = "";
+
+    public bool IsJoinDialogOpen => JoinDialogGame is not null;
+    public string NetId => _s.Net.Id ?? "–";
+
+    /// <summary>Von der View gesetzt (Zwischenablage braucht das Fenster).</summary>
+    public Func<string, Task>? CopyText { get; set; }
+
+    partial void OnJoinDialogGameChanged(GameViewModel? value) { OnPropertyChanged(nameof(IsJoinDialogOpen)); OnPropertyChanged(nameof(IsAnyDialogOpen)); }
+
+    private void OnNetEvent(System.Text.Json.Nodes.JsonObject ev)
+    {
+        var name = (string?)ev["event"] ?? "";
+        var game = (string?)ev["game"];
+        if (game is not null && Games.FirstOrDefault(g => g.Id.Equals(game, StringComparison.OrdinalIgnoreCase)) is { } vm)
+            vm.OnNetEvent(name, ev);
+        UpdateNetStatus();
+    }
+
+    private void UpdateNetStatus()
+    {
+        NetStatus = _s.Net.StartError
+            ?? (!_s.Net.IsAvailable ? "Wird gestartet …"
+                : _s.Net.IsOnline ? $"Bereit · du erscheinst als „{_s.Net.Name}“"
+                : "Bereit, sucht noch eine Verbindung ins Internet …");
+        OnPropertyChanged(nameof(NetId));
+    }
+
+    [RelayCommand]
+    private void SaveDisplayName()
+    {
+        var name = DisplayName.Trim();
+        _s.Settings.Update(s => s with { DisplayName = name.Length == 0 ? null : name });
+        _s.Net.SetName(name);
+        UpdateNetStatus();
+    }
+
+    public void OpenJoinDialog(GameViewModel game)
+    {
+        JoinCode = "";
+        JoinDialogGame = game;
+    }
+
+    [RelayCommand]
+    private void ConfirmJoin()
+    {
+        var game = JoinDialogGame;
+        var code = JoinCode.Trim();
+        if (game is null || code.Length == 0) return;
+        CloseDialogs();
+        game.StartMultiplayer("join", code);
+    }
+
+    [RelayCommand]
+    private async Task CopyOwnIdAsync()
+    {
+        if (_s.Net.Id is { } id) await CopyAsync(id);
+    }
+
+    public async Task CopyAsync(string text)
+    {
+        if (CopyText is not null) await CopyText(text);
     }
 
     public ObservableCollection<GameViewModel> Games { get; } = [];
@@ -64,7 +136,7 @@ public sealed partial class MainViewModel : ObservableObject
     public bool HasLauncherUpdate => PendingLauncherVersion is not null;
     public bool HasDownload => ActiveDownload is not null;
     public bool IsVersionDialogOpen => VersionDialogGame is not null;
-    public bool IsAnyDialogOpen => IsVersionDialogOpen || IsConfirmOpen;
+    public bool IsAnyDialogOpen => IsVersionDialogOpen || IsConfirmOpen || IsJoinDialogOpen;
     public bool HasNews => NewsItems.Count > 0;
     public string GamesHeader => $"({Games.Count})";
     public string LauncherUpdateText => $"Mett Launcher {PendingLauncherVersion} ist bereit. Neustarten, um das Update abzuschließen.";
@@ -72,6 +144,7 @@ public sealed partial class MainViewModel : ObservableObject
     public bool IsCatLibrary => SettingsCategory == SettingsCategory.Library;
     public bool IsCatUpdates => SettingsCategory == SettingsCategory.Updates;
     public bool IsCatAbout => SettingsCategory == SettingsCategory.About;
+    public bool IsCatMultiplayer => SettingsCategory == SettingsCategory.Multiplayer;
     public bool CanSelfUpdate => _s.LauncherUpdates.IsInstalled;
 
     partial void OnSectionChanged(Section value)
@@ -93,6 +166,7 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsCatLibrary));
         OnPropertyChanged(nameof(IsCatUpdates));
         OnPropertyChanged(nameof(IsCatAbout));
+        OnPropertyChanged(nameof(IsCatMultiplayer));
     }
     partial void OnAutoUpdateGamesChanged(bool value) => _s.Settings.Update(s => s with { AutoUpdate = value });
     partial void OnIncludePrereleasesChanged(bool value)
@@ -217,6 +291,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand] private void ShowSettingsLibrary() => SettingsCategory = SettingsCategory.Library;
     [RelayCommand] private void ShowSettingsUpdates() => SettingsCategory = SettingsCategory.Updates;
     [RelayCommand] private void ShowSettingsAbout() => SettingsCategory = SettingsCategory.About;
+    [RelayCommand] private void ShowSettingsMultiplayer() => SettingsCategory = SettingsCategory.Multiplayer;
 
     [RelayCommand]
     private void OpenNewsItem(NewsItemViewModel? item)
@@ -278,6 +353,7 @@ public sealed partial class MainViewModel : ObservableObject
     public void CloseDialogs()
     {
         VersionDialogGame = null;
+        JoinDialogGame = null;
         IsConfirmOpen = false;
         _confirmAction = null;
     }

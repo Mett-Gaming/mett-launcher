@@ -11,6 +11,13 @@ $publish = Join-Path $root 'publish'
 $dist = Join-Path $root 'dist'
 if (Test-Path $publish) { Remove-Item $publish -Recurse -Force }
 
+Push-Location native
+cargo test --workspace
+if ($LASTEXITCODE -ne 0) { Pop-Location; throw 'Rust-Tests fehlgeschlagen.' }
+cargo build --release -p mett-netd
+if ($LASTEXITCODE -ne 0) { Pop-Location; throw 'mett-netd-Build fehlgeschlagen.' }
+Pop-Location
+
 dotnet test -c Release
 if ($LASTEXITCODE -ne 0) { throw 'Tests fehlgeschlagen.' }
 

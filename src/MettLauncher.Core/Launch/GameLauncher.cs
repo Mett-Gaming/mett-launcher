@@ -105,7 +105,8 @@ public sealed class GameLauncher
 
     public GameSession? GetSession(string gameId) => _running.GetValueOrDefault(gameId);
 
-    public GameSession Launch(GameEntry game)
+    /// <param name="environment">Zusätzliche Umgebungsvariablen für das Spiel (z. B. <c>METT_NET_*</c> für den Mehrspieler).</param>
+    public GameSession Launch(GameEntry game, IReadOnlyDictionary<string, string>? environment = null)
     {
         var state = _library.GetGame(game.Id);
         if (state is not { IsInstalled: true }) throw new GameNotInstalledException(game.Name);
@@ -126,6 +127,8 @@ public sealed class GameLauncher
                 UseShellExecute = false,
             };
             foreach (var arg in game.Args) psi.ArgumentList.Add(arg);
+            if (environment is not null)
+                foreach (var (k, v) in environment) psi.Environment[k] = v;
             startedAt = _time.GetUtcNow();
             process = _starter.Start(psi);
         }

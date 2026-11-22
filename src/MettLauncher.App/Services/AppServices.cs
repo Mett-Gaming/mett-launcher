@@ -26,7 +26,11 @@ public sealed class AppServices : IDisposable
         Installer = new InstallService(Http, Library, Settings, id => Launcher.IsRunning(id));
         Images = new ImageCache(Http, Paths);
         LauncherUpdates = new LauncherUpdateService();
+        Net = new NetService();
+        Net.Start(Paths, Settings.Current.DisplayName);
     }
+
+    public NetService Net { get; }
 
     public LauncherPaths Paths { get; }
     public HttpClient Http { get; }
@@ -40,5 +44,9 @@ public sealed class AppServices : IDisposable
     public ImageCache Images { get; }
     public LauncherUpdateService LauncherUpdates { get; }
 
-    public void Dispose() => Http.Dispose();
+    public void Dispose()
+    {
+        Net.Dispose();
+        Http.Dispose();
+    }
 }

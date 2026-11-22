@@ -10,7 +10,7 @@
     <ApplicationIcon>..\..\assets\icon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Product>Mett Launcher</Product>
     <Company>Mett Gaming</Company>
     <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
@@ -28,6 +28,17 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.6" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Velopack" Version="1.2.161" />
+  </ItemGroup>
+
+  <!-- Peer-to-Peer-Netzdienst (Rust, native/mett-netd). Release-Build bevorzugt, sonst Debug. -->
+  <PropertyGroup>
+    <MettNetdRelease>$(MSBuildThisFileDirectory)..\..\native\target\release\mett-netd.exe</MettNetdRelease>
+    <MettNetdDebug>$(MSBuildThisFileDirectory)..\..\native\target\debug\mett-netd.exe</MettNetdDebug>
+    <MettNetdPath Condition="Exists('$(MettNetdRelease)')">$(MettNetdRelease)</MettNetdPath>
+    <MettNetdPath Condition="'$(MettNetdPath)' == '' And Exists('$(MettNetdDebug)')">$(MettNetdDebug)</MettNetdPath>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(MettNetdPath)' != ''">
+    <None Include="$(MettNetdPath)" Link="mett-netd.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

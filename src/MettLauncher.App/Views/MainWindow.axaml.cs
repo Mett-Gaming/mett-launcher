@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Platform.Storage;
 using MettLauncher.App.ViewModels;
 
@@ -22,7 +23,11 @@ public partial class MainWindow : Window
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
-        if (DataContext is MainViewModel vm) vm.PickFolder = PickFolderAsync;
+        if (DataContext is MainViewModel vm)
+        {
+            vm.PickFolder = PickFolderAsync;
+            vm.CopyText = async text => { if (Clipboard is { } cb) await cb.SetTextAsync(text); };
+        }
     }
 
     private void OnDragAreaPressed(object? sender, PointerPressedEventArgs e)
