@@ -30,6 +30,7 @@ pub const ALPN: &[u8] = b"mett/net/1";
 pub struct Shared {
     pub endpoint: Endpoint,
     pub token: String,
+    /// Anzeigename; leer = noch nicht festgelegt (dann kein Hosten/Beitreten).
     pub name: RwLock<String>,
     /// Offene Spiele je Spiel-ID (nur ein Host pro Spiel und Rechner).
     pub hosts: Mutex<HashMap<String, Arc<session::HostState>>>,
@@ -85,8 +86,11 @@ fn load_or_create_key(dir: &std::path::Path) -> Result<SecretKey> {
     Ok(key)
 }
 
-fn default_name(id: &str) -> String {
-    format!("Spieler-{}", &id[..4.min(id.len())].to_uppercase())
+/// Prüft einen Anzeigenamen: 2–24 sichtbare Zeichen, ohne Steuerzeichen. `None` = ungültig/leer.
+pub fn validate_name(raw: &str) -> Option<String> {
+    let n: String = raw.chars().filter(|c| !c.is_control()).collect::<String>().trim().to_string();
+    let len = n.chars().count();
+    (2..=24).contains(&len).then_some(n)
 }
 
 #[tokio::main]
@@ -115,7 +119,7 @@ async fn main() -> Result<()> {
         .await
         .map_err(|e| anyhow::anyhow!("iroh-Endpoint: {e}"))?;
     let id = endpoint.id().to_string();
-    let name = if args.name.trim().is_empty() { default_name(&id) } else { args.name.trim().to_string() };
+    let name = validate_name(&args.name).unwrap_or_default();
 
     let listener = TcpListener::bind(("127.0.0.1", 0)).await?;
     let addr = listener.local_addr()?;
@@ -182,8 +186,9 @@ async fn main() -> Result<()> {
         match cmd.get("cmd").and_then(|c| c.as_str()) {
             Some("name") => {
                 if let Some(n) = cmd.get("name").and_then(|n| n.as_str()) {
-                    let n = n.trim();
-                    *shared.name.write().await = if n.is_empty() { default_name(&id) } else { n.chars().take(32).collect() };
+                    let valid = validate_name(n);
+                    *shared.name.write().await = valid.clone().unwrap_or_default();
+                    shared.event(json!({ "event": "name", "name": valid, "valid": valid.is_some() }));
                 }
             }
             Some("quit") => break,
@@ -197,4 +202,18 @@ async fn main() -> Result<()> {
 
 pub fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_name;
+
+    #[test]
+    fn display_names_must_be_set_and_sane() {
+        assert_eq!(validate_name("  Würfelhusten "), Some("Würfelhusten".into()));
+        assert_eq!(validate_name(""), None);
+        assert_eq!(validate_name(" x "), None);
+        assert_eq!(validate_name("a\u{0007}b"), Some("ab".into()));
+        assert_eq!(validate_name(&"x".repeat(25)), None);
+    }
 }

@@ -52,6 +52,9 @@ public sealed partial class MainViewModel : ObservableObject
         var game = (string?)ev["game"];
         if (game is not null && Games.FirstOrDefault(g => g.Id.Equals(game, StringComparison.OrdinalIgnoreCase)) is { } vm)
             vm.OnNetEvent(name, ev);
+        // Ein Spiel wollte hosten/beitreten, aber es gibt noch keinen Namen -> Dialog zeigen.
+        if (name == "name_required" && !IsNameDialogOpen)
+            RequireDisplayName(null, "Ein Spiel möchte den Mehrspieler nutzen. Lege dafür einen Anzeigenamen fest – danach im Spiel erneut versuchen.");
         UpdateNetStatus();
     }
 
@@ -59,18 +62,74 @@ public sealed partial class MainViewModel : ObservableObject
     {
         NetStatus = _s.Net.StartError
             ?? (!_s.Net.IsAvailable ? "Wird gestartet …"
-                : _s.Net.IsOnline ? $"Bereit · du erscheinst als „{_s.Net.Name}“"
+                : !HasDisplayName ? "Kein Anzeigename festgelegt – Hosten und Beitreten sind erst danach möglich."
+                : _s.Net.IsOnline ? $"Bereit · du erscheinst als „{_s.Settings.Current.DisplayName}“"
                 : "Bereit, sucht noch eine Verbindung ins Internet …");
         OnPropertyChanged(nameof(NetId));
     }
 
+    /// <summary>Gleiche Regel wie in mett-netd: 2–24 sichtbare Zeichen, keine Steuerzeichen.</summary>
+    public static string? ValidateDisplayName(string? raw)
+    {
+        if (raw is null) return null;
+        var n = new string(raw.Where(c => !char.IsControl(c)).ToArray()).Trim();
+        var len = new System.Globalization.StringInfo(n).LengthInTextElements;
+        return len is >= 2 and <= 24 ? n : null;
+    }
+
+    public bool HasDisplayName => ValidateDisplayName(_s.Settings.Current.DisplayName) is not null;
+
+    private bool ApplyDisplayName(string raw, out string? error)
+    {
+        var name = ValidateDisplayName(raw);
+        if (name is null)
+        {
+            error = "Der Anzeigename braucht 2 bis 24 Zeichen.";
+            return false;
+        }
+        _s.Settings.Update(s => s with { DisplayName = name });
+        _s.Net.SetName(name);
+        DisplayName = name;
+        error = null;
+        UpdateNetStatus();
+        return true;
+    }
+
+    [ObservableProperty] public partial string? DisplayNameError { get; set; }
+
     [RelayCommand]
     private void SaveDisplayName()
     {
-        var name = DisplayName.Trim();
-        _s.Settings.Update(s => s with { DisplayName = name.Length == 0 ? null : name });
-        _s.Net.SetName(name);
-        UpdateNetStatus();
+        DisplayNameError = ApplyDisplayName(DisplayName, out var error) ? null : error;
+    }
+
+    // ---- Pflichtdialog „Anzeigename festlegen“ ----
+    private Action? _afterName;
+    [ObservableProperty] public partial bool IsNameDialogOpen { get; set; }
+    [ObservableProperty] public partial string NameDialogInput { get; set; } = "";
+    [ObservableProperty] public partial string NameDialogText { get; set; } = "";
+    [ObservableProperty] public partial string? NameDialogError { get; set; }
+    partial void OnIsNameDialogOpenChanged(bool value) => OnPropertyChanged(nameof(IsAnyDialogOpen));
+
+    /// <summary>Führt <paramref name="then"/> aus, sobald ein gültiger Anzeigename feststeht (ggf. nach dem Dialog).</summary>
+    public void RequireDisplayName(Action? then, string? text = null)
+    {
+        if (then is not null && HasDisplayName) { then(); return; }
+        _afterName = then;
+        NameDialogInput = _s.Settings.Current.DisplayName ?? "";
+        NameDialogError = null;
+        NameDialogText = text ?? "Für den Mehrspieler brauchst du einen Anzeigenamen. So sehen dich deine Mitspieler.";
+        IsNameDialogOpen = true;
+    }
+
+    [RelayCommand]
+    private void ConfirmName()
+    {
+        if (!ApplyDisplayName(NameDialogInput, out var error)) { NameDialogError = error; return; }
+        var then = _afterName;
+        _afterName = null;
+        IsNameDialogOpen = false;
+        then?.Invoke();
     }
 
     public void OpenJoinDialog(GameViewModel game)
@@ -136,7 +195,7 @@ public sealed partial class MainViewModel : ObservableObject
     public bool HasLauncherUpdate => PendingLauncherVersion is not null;
     public bool HasDownload => ActiveDownload is not null;
     public bool IsVersionDialogOpen => VersionDialogGame is not null;
-    public bool IsAnyDialogOpen => IsVersionDialogOpen || IsConfirmOpen || IsJoinDialogOpen;
+    public bool IsAnyDialogOpen => IsVersionDialogOpen || IsConfirmOpen || IsJoinDialogOpen || IsNameDialogOpen;
     public bool HasNews => NewsItems.Count > 0;
     public string GamesHeader => $"({Games.Count})";
     public string LauncherUpdateText => $"Mett Launcher {PendingLauncherVersion} ist bereit. Neustarten, um das Update abzuschließen.";
@@ -354,6 +413,8 @@ public sealed partial class MainViewModel : ObservableObject
     {
         VersionDialogGame = null;
         JoinDialogGame = null;
+        IsNameDialogOpen = false;
+        _afterName = null;
         IsConfirmOpen = false;
         _confirmAction = null;
     }

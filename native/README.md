@@ -20,7 +20,7 @@ Spiel A ──TCP 127.0.0.1── mett-netd (Launcher A) ══ iroh/QUIC, versc
 
 ```toml
 [dependencies]
-mett-net = { git = "https://github.com/Mett-Gaming/mett-launcher", tag = "v0.2.0" }
+mett-net = { git = "https://github.com/Mett-Gaming/mett-launcher", tag = "v0.2.1" }
 ```
 
 ```rust

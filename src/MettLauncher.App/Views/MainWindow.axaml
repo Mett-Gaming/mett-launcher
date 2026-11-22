@@ -222,9 +222,10 @@
               <Grid ColumnDefinitions="*,220,Auto" ColumnSpacing="8">
                 <StackPanel Spacing="2">
                   <TextBlock Text="Anzeigename" FontWeight="SemiBold" />
-                  <TextBlock Classes="caption" Text="So sehen dich Mitspieler. Leer lassen für einen automatischen Namen." />
+                  <TextBlock Classes="caption" Text="Pflicht für den Mehrspieler: So sehen dich deine Mitspieler (2–24 Zeichen)." />
+                  <TextBlock Classes="caption" Foreground="{StaticResource Danger}" Text="{Binding DisplayNameError}" IsVisible="{Binding DisplayNameError, Converter={x:Static ObjectConverters.IsNotNull}}" />
                 </StackPanel>
-                <TextBox Grid.Column="1" Text="{Binding DisplayName}" MaxLength="32" PlaceholderText="Spieler-…" VerticalAlignment="Center" />
+                <TextBox Grid.Column="1" Text="{Binding DisplayName}" MaxLength="24" PlaceholderText="Dein Name" VerticalAlignment="Center" />
                 <Button Grid.Column="2" Classes="secondary" Content="Speichern" Command="{Binding SaveDisplayNameCommand}" VerticalAlignment="Center" />
               </Grid>
             </Border>
@@ -331,6 +332,21 @@
             </ItemsControl>
           </ScrollViewer>
           <Button Classes="secondary" Content="Schließen" HorizontalAlignment="Right" Command="{Binding CloseDialogsCommand}" />
+        </StackPanel>
+      </Border>
+
+      <!-- Anzeigename festlegen (Pflicht für Mehrspieler) -->
+      <Border Classes="dialog" Width="460" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsNameDialogOpen}">
+        <StackPanel Spacing="14">
+          <TextBlock Classes="h1" Text="Anzeigename festlegen" />
+          <TextBlock Classes="body" Text="{Binding NameDialogText}" />
+          <TextBox Text="{Binding NameDialogInput}" MaxLength="24" PlaceholderText="Dein Name" AutomationProperties.Name="Anzeigename" />
+          <TextBlock Classes="caption" Foreground="{StaticResource Danger}" Text="{Binding NameDialogError}"
+                     IsVisible="{Binding NameDialogError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <Button Classes="ghost" Content="Abbrechen" Command="{Binding CloseDialogsCommand}" />
+            <Button Classes="primary" Content="Speichern" Command="{Binding ConfirmNameCommand}" />
+          </StackPanel>
         </StackPanel>
       </Border>
 

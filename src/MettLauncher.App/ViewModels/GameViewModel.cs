@@ -281,10 +281,10 @@ public sealed partial class GameViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void HostGame() => StartMultiplayer("host", null);
+    private void HostGame() => _main.RequireDisplayName(() => StartMultiplayer("host", null));
 
     [RelayCommand]
-    private void JoinGame() => _main.OpenJoinDialog(this);
+    private void JoinGame() => _main.RequireDisplayName(() => _main.OpenJoinDialog(this));
 
     public void StartMultiplayer(string action, string? code)
     {

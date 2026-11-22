@@ -30,6 +30,9 @@ use crate::{
     peer::{PeerLink, read_json, spawn_pumps, write_json},
 };
 
+/// Fehlermeldung, wenn noch kein Anzeigename festgelegt ist.
+pub const NAME_REQUIRED: &str = "Bitte lege im Mett Launcher zuerst einen Anzeigenamen fest (Einstellungen → Mehrspieler).";
+
 /// Ein gehostetes Spiel auf diesem Rechner.
 pub struct HostState {
     game: String,
@@ -55,12 +58,17 @@ impl HostState {
             conn.closed().await;
             return Ok(());
         }
+        let Some(name) = crate::validate_name(&name) else {
+            write_json(&mut send, &PeerWelcome { ok: false, name: String::new(), reason: "Ohne Anzeigenamen kein Beitritt.".into() }).await?;
+            let _ = send.finish();
+            conn.closed().await;
+            return Ok(());
+        };
         let host_name = shared.name.read().await.clone();
         write_json(&mut send, &PeerWelcome { ok: true, name: host_name, reason: String::new() }).await?;
 
         let idx = self.next_peer.fetch_add(1, Ordering::Relaxed).max(1);
         let id = conn.remote_id().to_string();
-        let name = sanitize_name(&name, &id);
         let me = Arc::downgrade(self);
         let ev_shared = shared.clone();
         let link = spawn_pumps(conn, send, recv, idx, self.to_game.clone(), move |reason| {
@@ -167,6 +175,11 @@ pub async fn run(shared: Arc<Shared>, stream: TcpStream) -> Result<()> {
         };
         match frame.kind {
             kind::HOST => {
+                if shared.name.read().await.is_empty() {
+                    to_game.send(err(NAME_REQUIRED.into())).await?;
+                    shared.event(json!({ "event": "name_required", "game": game }));
+                    continue;
+                }
                 if !matches!(role, Role::None) {
                     to_game.send(err("Bereits in einer Sitzung.".into())).await?;
                     continue;
@@ -192,6 +205,11 @@ pub async fn run(shared: Arc<Shared>, stream: TcpStream) -> Result<()> {
                 shared.event(json!({ "event": "hosted", "game": game, "code": code }));
             }
             kind::JOIN => {
+                if shared.name.read().await.is_empty() {
+                    to_game.send(err(NAME_REQUIRED.into())).await?;
+                    shared.event(json!({ "event": "name_required", "game": game }));
+                    continue;
+                }
                 if !matches!(role, Role::None) {
                     to_game.send(err("Bereits in einer Sitzung.".into())).await?;
                     continue;
