@@ -6,7 +6,7 @@ Launcher für alle Spiele von [Mett Gaming](https://github.com/Mett-Gaming): ins
 **Download** aus den [Releases](https://github.com/Mett-Gaming/mett-launcher/releases/latest):
 
 - **Windows:** `MettLauncher-win-Setup.exe` – installiert ohne Adminrechte nach `%LocalAppData%\MettLauncher`.
-- **Linux / Steam Deck (Vorschau):** `MettLauncher-linux.AppImage` herunterladen, ausführbar machen
+- **Linux / Steam Deck (Vorschau):** `MettLauncher.AppImage` herunterladen, ausführbar machen
   (`chmod +x`, bzw. Rechtsklick → Eigenschaften → „Ausführbar“) und starten. Daten liegen unter `~/.local/share/MettLauncher`.
   Auf dem Steam Deck im Desktop-Modus; optional in Steam „Ein Nicht-Steam-Spiel hinzufügen“ für den Game Mode.
 
