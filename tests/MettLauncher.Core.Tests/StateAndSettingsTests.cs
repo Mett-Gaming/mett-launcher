@@ -118,7 +118,7 @@ public class SettingsTests
         Assert.True(store.Current.AutoUpdate);
         Assert.False(store.Current.IncludePrereleases);
         Assert.Equal(tmp.Paths.DefaultGamesDir, store.LibraryDir);
-        Assert.EndsWith(Path.Combine("MettLauncher", "games"), LauncherPaths.Default().DefaultGamesDir);
+        Assert.EndsWith(Path.Combine("MettGaming", "Launcher", "games"), LauncherPaths.Default().DefaultGamesDir);
     }
 
     [Fact]

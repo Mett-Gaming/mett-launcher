@@ -16,6 +16,8 @@ public sealed class AppServices : IDisposable
     public AppServices()
     {
         Paths = LauncherPaths.Default();
+        // Bis v0.3.0 lagen die Daten im Velopack-Installordner -> einmalig umziehen, bevor etwas geladen wird.
+        Migration = LegacyDataMigration.Run(Paths, LauncherPaths.LegacyRoot);
         Http = MettHttp.CreateClient();
         Settings = new SettingsStore(Paths);
         Library = new LibraryStore(Paths);
@@ -44,6 +46,7 @@ public sealed class AppServices : IDisposable
     public static bool IsLinux => OperatingSystem.IsLinux();
 
     public LauncherPaths Paths { get; }
+    public MigrationResult Migration { get; }
     public HttpClient Http { get; }
     public SettingsStore Settings { get; }
     public LibraryStore Library { get; }

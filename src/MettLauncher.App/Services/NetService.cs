@@ -44,7 +44,7 @@ public sealed class NetService : IDisposable
                 RedirectStandardError = true,
             };
             psi.ArgumentList.Add("--data-dir");
-            psi.ArgumentList.Add(Path.Combine(paths.Root, "net"));
+            psi.ArgumentList.Add(paths.NetDir);
             psi.ArgumentList.Add("--name");
             psi.ArgumentList.Add(displayName ?? "");
             _process = Process.Start(psi) ?? throw new InvalidOperationException("Start fehlgeschlagen");
