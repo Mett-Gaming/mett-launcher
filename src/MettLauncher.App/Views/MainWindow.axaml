@@ -3,6 +3,7 @@
         xmlns:vm="using:MettLauncher.App.ViewModels"
         xmlns:c="using:MettLauncher.App.Controls"
         xmlns:v="using:MettLauncher.App.Views"
+        xmlns:chrome="using:Avalonia.Controls.Chrome"
         x:Class="MettLauncher.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="Mett Launcher"
@@ -12,7 +13,9 @@
         Background="{StaticResource BgApp}"
         FontFamily="{StaticResource UiFont}"
         Foreground="{StaticResource TextPrimary}"
-        WindowDecorations="BorderOnly">
+        WindowDecorations="BorderOnly"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="48">
 
   <Grid RowDefinitions="48,Auto,*,32">
 
@@ -25,15 +28,15 @@
           <Button Classes="nav" Classes.active="{Binding IsNews}" Content="NEUIGKEITEN" Command="{Binding ShowNewsCommand}" />
           <Button Classes="nav" Classes.active="{Binding IsSettings}" Content="EINSTELLUNGEN" Command="{Binding ShowSettingsCommand}" />
         </StackPanel>
-        <Border Grid.Column="2" x:Name="DragArea" Background="Transparent" />
+        <Border Grid.Column="2" x:Name="DragArea" Background="Transparent" chrome:WindowDecorationProperties.ElementRole="TitleBar" />
         <StackPanel Grid.Column="3" Orientation="Horizontal">
-          <Button Classes="chrome" x:Name="MinButton" ToolTip.Tip="Minimieren" AutomationProperties.Name="Minimieren">
+          <Button Classes="chrome" x:Name="MinButton" chrome:WindowDecorationProperties.ElementRole="MinimizeButton" ToolTip.Tip="Minimieren" AutomationProperties.Name="Minimieren">
             <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconMinus}" />
           </Button>
-          <Button Classes="chrome" x:Name="MaxButton" ToolTip.Tip="Maximieren" AutomationProperties.Name="Maximieren">
+          <Button Classes="chrome" x:Name="MaxButton" chrome:WindowDecorationProperties.ElementRole="MaximizeButton" ToolTip.Tip="Maximieren" AutomationProperties.Name="Maximieren">
             <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconMaximize}" />
           </Button>
-          <Button Classes="chrome close" x:Name="CloseButton" ToolTip.Tip="Schließen" AutomationProperties.Name="Schließen">
+          <Button Classes="chrome close" x:Name="CloseButton" chrome:WindowDecorationProperties.ElementRole="CloseButton" ToolTip.Tip="Schließen" AutomationProperties.Name="Schließen">
             <c:LucideIcon Width="14" Height="14" Data="{StaticResource IconX}" />
           </Button>
         </StackPanel>
