@@ -29,6 +29,7 @@ public sealed partial class MainViewModel : ObservableObject
         _s.Launcher.GameExited += (_, _) => Dispatcher.UIThread.Post(() => { foreach (var g in Games) g.Recompute(); });
         DisplayName = _s.Settings.Current.DisplayName ?? "";
         ProtonLog = _s.Settings.Current.ProtonLog;
+        DiscordPresence = _s.Settings.Current.DiscordPresence;
         _s.Net.EventReceived += ev => Dispatcher.UIThread.Post(() => OnNetEvent(ev));
         UpdateNetStatus();
     }
@@ -117,6 +118,8 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] public partial string UmuInfo { get; set; } = "";
     [ObservableProperty] public partial string SteamProtonInfo { get; set; } = "";
     [ObservableProperty] public partial string ProtonUpdateStatus { get; set; } = "";
+    [ObservableProperty] public partial bool DiscordPresence { get; set; }
+    partial void OnDiscordPresenceChanged(bool value) => _s.Settings.Update(s => s with { DiscordPresence = value });
     [ObservableProperty] public partial bool ProtonLog { get; set; }
     partial void OnProtonLogChanged(bool value) => _s.Settings.Update(s => s with { ProtonLog = value });
 
@@ -421,6 +424,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void ApplyCatalog(GameCatalog catalog)
     {
+        _s.Presence.UpdateCatalog(catalog);
         var selectedId = SelectedGame?.Id ?? _s.Library.Snapshot().Games.Keys.FirstOrDefault();
         foreach (var entry in catalog.Games)
         {

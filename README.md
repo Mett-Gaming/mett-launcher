@@ -43,6 +43,21 @@ Antwort startet das Spiel einfach; festgepinnte Versionen werden nicht geprüft.
 Alles ist öffentlich, der Launcher braucht keinen Login. Katalog, News und Release-Listen werden zwischengespeichert,
 installierte Spiele lassen sich auch offline starten.
 
+## Discord-Anzeige
+
+Der Launcher zeigt in Discord, welches Spiel läuft (Einstellungen → Mehrspieler, abschaltbar). Nötig ist eine Anwendung im
+[Discord Developer Portal](https://discord.com/developers/applications); ihre öffentliche Id steht im Katalog als
+`discordAppId` (oben für den Launcher, optional je Spiel für eine eigene). Ohne Id bleibt die Anzeige aus.
+
+Spiele können Zusatzinfos melden. Beim Start bekommen sie `METT_PRESENCE_ADDR` (localhost) und `METT_PRESENCE_TOKEN` und
+schicken per TCP eine JSON-Zeile je Änderung, die erste mit Token:
+
+```json
+{"token":"…","details":"Im Markt","state":"Stufe: unruhig","party":[2,8]}
+```
+
+Alle Felder außer `token` sind optional. Mettgine-Spiele nutzen dafür `mettgine::presence`.
+
 ## Aufbau
 
 - `src/MettLauncher.Core` – UI-freie Logik: Katalog, News, Releases (ETag-Cache), Installation (Download → Prüfsumme →

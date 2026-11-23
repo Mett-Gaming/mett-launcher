@@ -4,6 +4,7 @@ using MettLauncher.Core.GitHub;
 using MettLauncher.Core.Install;
 using MettLauncher.Core.Launch;
 using MettLauncher.Core.News;
+using MettLauncher.Core.Presence;
 using MettLauncher.Core.Proton;
 using MettLauncher.Core.Settings;
 using MettLauncher.Core.State;
@@ -36,11 +37,18 @@ public sealed class AppServices : IDisposable
         Installer = new InstallService(Http, Library, Settings, id => Launcher.IsRunning(id));
         Images = new ImageCache(Http, Paths);
         LauncherUpdates = new LauncherUpdateService();
+        PresenceServer = new PresenceServer();
+        PresenceServer.Start();
+        Discord = new DiscordPresence();
+        Presence = new PresenceService(PresenceServer, Discord.Show, Launcher, Settings, Catalog.ResolveAssetUrl);
         Net = new NetService();
         Net.Start(Paths, Settings.Current.DisplayName);
     }
 
     public NetService Net { get; }
+    public PresenceServer PresenceServer { get; }
+    public DiscordPresence Discord { get; }
+    public PresenceService Presence { get; }
     public ProtonManager Proton { get; }
     public UmuManager Umu { get; }
     public ProtonRunner ProtonRunner { get; }
@@ -63,6 +71,8 @@ public sealed class AppServices : IDisposable
     public void Dispose()
     {
         Net.Dispose();
+        PresenceServer.Dispose();
+        Discord.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(1));
         Http.Dispose();
     }
 }

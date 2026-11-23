@@ -223,6 +223,15 @@
           <StackPanel IsVisible="{Binding IsCatMultiplayer}">
             <TextBlock Classes="h1" Text="Mehrspieler" Margin="0,0,0,8" />
             <Border Classes="settingrow">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="In Discord zeigen, was ich spiele" FontWeight="SemiBold" />
+                  <TextBlock Classes="caption" TextWrapping="Wrap" Text="Spiel, Spielzeit und was das Spiel über sich meldet. Beitrittscodes werden nie gezeigt." />
+                </StackPanel>
+                <ToggleSwitch Grid.Column="1" IsChecked="{Binding DiscordPresence}" />
+              </Grid>
+            </Border>
+            <Border Classes="settingrow">
               <Grid ColumnDefinitions="*,220,Auto" ColumnSpacing="8">
                 <StackPanel Spacing="2">
                   <TextBlock Text="Anzeigename" FontWeight="SemiBold" />

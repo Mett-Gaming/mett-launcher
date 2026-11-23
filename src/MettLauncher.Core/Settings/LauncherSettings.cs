@@ -16,6 +16,8 @@ public sealed record LauncherSettings
     public string? DisplayName { get; init; }
     /// <summary>Linux: Proton schreibt ein ausführliches Log nach <c>logs\</c> (<c>PROTON_LOG=1</c>).</summary>
     public bool ProtonLog { get; init; }
+    /// <summary>Zeigt in Discord, was gespielt wird.</summary>
+    public bool DiscordPresence { get; init; } = true;
 }
 
 /// <summary>Lädt/speichert <c>settings.json</c>.</summary>

@@ -361,7 +361,7 @@ public sealed partial class GameViewModel : ObservableObject
             // Erst jetzt holen: ein Update kann gedauert haben.
             var env = IsMultiplayer || action is not null ? _s.Net.GameEnvironment(Id, action, code) : null;
             if (env is null && action is not null) { ShowNetNotReady(); return; }
-            var session = _s.Launcher.Launch(Entry, env);
+            var session = _s.Launcher.Launch(Entry, _s.Presence.Environment(Id, env));
             Phase = GamePhase.Running;
             LastPlayedText = "Jetzt";
             _ = session.Exited.ContinueWith(t => Dispatcher.UIThread.Post(() =>

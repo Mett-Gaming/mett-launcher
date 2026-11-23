@@ -4,6 +4,8 @@ namespace MettLauncher.Core.Catalog;
 public sealed record GameCatalog
 {
     public int Schema { get; init; }
+    /// <summary>Discord-Anwendung des Launchers (öffentliche Id, kein Geheimnis); ohne sie gibt es keine Discord-Anzeige.</summary>
+    public string? DiscordAppId { get; init; }
     public IReadOnlyList<GameEntry> Games { get; init; } = [];
 
     public GameEntry? Find(string id) => Games.FirstOrDefault(g => string.Equals(g.Id, id, StringComparison.OrdinalIgnoreCase));
@@ -31,6 +33,8 @@ public sealed record GameEntry
     public bool IncludePrereleases { get; init; }
     /// <summary>Spiel nutzt den Mehrspieler des Launchers (<c>mett-net</c>); zeigt „Mit Freunden spielen“.</summary>
     public bool Multiplayer { get; init; }
+    /// <summary>Eigene Discord-Anwendung des Spiels; ohne sie erscheint der Status unter der des Launchers.</summary>
+    public string? DiscordAppId { get; init; }
     /// <summary>Eintrag in der umu-Datenbank (Proton-Fixes), z. B. <c>umu-12345</c>; ohne = <c>umu-default</c>.</summary>
     public string? UmuId { get; init; }
     /// <summary>Unter Linux: <c>proton</c> (Standard, Windows-Build über Proton) oder <c>native</c> (Linux-Build im Zip).</summary>
