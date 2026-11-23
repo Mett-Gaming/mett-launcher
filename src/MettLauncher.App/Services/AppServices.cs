@@ -32,6 +32,7 @@ public sealed class AppServices : IDisposable
         // Unter Linux laufen Windows-Spiele über Proton; nur Spiele mit "linux": "native" starten direkt.
         Launcher = new GameLauncher(Library, runnerFor: game =>
             OperatingSystem.IsLinux() && !game.RunsNativeOnLinux ? ProtonRunner : native);
+        LaunchGate = new LaunchUpdateGate(Releases, Library, Settings);
         Installer = new InstallService(Http, Library, Settings, id => Launcher.IsRunning(id));
         Images = new ImageCache(Http, Paths);
         LauncherUpdates = new LauncherUpdateService();
@@ -54,6 +55,7 @@ public sealed class AppServices : IDisposable
     public ReleaseService Releases { get; }
     public NewsService News { get; }
     public GameLauncher Launcher { get; }
+    public LaunchUpdateGate LaunchGate { get; }
     public InstallService Installer { get; }
     public ImageCache Images { get; }
     public LauncherUpdateService LauncherUpdates { get; }

@@ -36,6 +36,10 @@ GE-Proton aus (inkl. Mehrspieler-Verbindung). Echte Spiele auf echter Hardware/S
 | Spielversionen | GitHub-Releases des jeweiligen Spiel-Repos (Zip-Asset, sha256 aus der API) |
 | Launcher-Updates | Releases dieses Repos (Velopack) |
 
+Beim Klick auf „Spielen“ (auch beim Hosten und Beitreten) sucht der Launcher direkt nach einer neueren Version und fragt
+vor dem Start: „Aktualisieren und starten“, „Ohne Update starten“ oder „Abbrechen“. Ohne Internet oder nach 4 Sekunden ohne
+Antwort startet das Spiel einfach; festgepinnte Versionen werden nicht geprüft.
+
 Alles ist öffentlich, der Launcher braucht keinen Login. Katalog, News und Release-Listen werden zwischengespeichert,
 installierte Spiele lassen sich auch offline starten.
 

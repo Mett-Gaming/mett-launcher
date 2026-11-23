@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using MettLauncher.App.Services;
 using MettLauncher.Core.Catalog;
 using MettLauncher.Core.GitHub;
+using MettLauncher.Core.Launch;
 using MettLauncher.Core.News;
 
 namespace MettLauncher.App.ViewModels;
@@ -332,7 +333,7 @@ public sealed partial class MainViewModel : ObservableObject
     public bool HasDownload => ActiveDownload is not null;
     public bool ShowIdleDownloads => !HasDownload && !HasToolDownload;
     public bool IsVersionDialogOpen => VersionDialogGame is not null;
-    public bool IsAnyDialogOpen => IsVersionDialogOpen || IsConfirmOpen || IsJoinDialogOpen || IsNameDialogOpen || IsProtonDialogOpen;
+    public bool IsAnyDialogOpen => IsVersionDialogOpen || IsConfirmOpen || IsJoinDialogOpen || IsNameDialogOpen || IsProtonDialogOpen || IsLaunchUpdateOpen;
     public bool HasNews => NewsItems.Count > 0;
     public string GamesHeader => $"({Games.Count})";
     public string LauncherUpdateText => $"Mett Launcher {PendingLauncherVersion} ist bereit. Neustarten, um das Update abzuschließen.";
@@ -559,7 +560,50 @@ public sealed partial class MainViewModel : ObservableObject
         _afterName = null;
         IsConfirmOpen = false;
         _confirmAction = null;
+        AnswerLaunchUpdate(LaunchUpdateChoice.Cancel);
     }
+
+    // ---- Dialog „Update verfügbar“ vor dem Spielstart ----
+    private readonly SemaphoreSlim _launchUpdateLock = new(1);
+    private TaskCompletionSource<LaunchUpdateChoice>? _launchUpdateAnswer;
+    [ObservableProperty] public partial bool IsLaunchUpdateOpen { get; set; }
+    [ObservableProperty] public partial string LaunchUpdatePromptText { get; set; } = "";
+    [ObservableProperty] public partial string LaunchUpdateVersions { get; set; } = "";
+    [ObservableProperty] public partial string? LaunchUpdateHint { get; set; }
+    [ObservableProperty] public partial string? LaunchUpdateError { get; set; }
+    partial void OnIsLaunchUpdateOpenChanged(bool value) => OnPropertyChanged(nameof(IsAnyDialogOpen));
+
+    /// <summary>Fragt vor dem Start, ob aktualisiert werden soll. Schließen des Dialogs zählt als „Abbrechen“.</summary>
+    public async Task<LaunchUpdateChoice> AskLaunchUpdateAsync(string gameName, LaunchUpdateOffer offer, string? error, bool multiplayer)
+    {
+        await _launchUpdateLock.WaitAsync(); // höchstens eine Nachfrage gleichzeitig
+        try
+        {
+            CloseDialogs();
+            LaunchUpdatePromptText = $"Für {gameName} gibt es eine neue Version.";
+            LaunchUpdateVersions = $"{offer.InstalledLabel} → {offer.Latest.Tag}";
+            LaunchUpdateHint = multiplayer ? "Host und Mitspieler brauchen die gleiche Version." : null;
+            LaunchUpdateError = error is null ? null : $"Das Update ist fehlgeschlagen: {error}";
+            var answer = _launchUpdateAnswer = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            IsLaunchUpdateOpen = true;
+            return await answer.Task;
+        }
+        finally
+        {
+            _launchUpdateLock.Release();
+        }
+    }
+
+    private void AnswerLaunchUpdate(LaunchUpdateChoice choice)
+    {
+        IsLaunchUpdateOpen = false;
+        var answer = _launchUpdateAnswer;
+        _launchUpdateAnswer = null;
+        answer?.TrySetResult(choice);
+    }
+
+    [RelayCommand] private void LaunchUpdateAccept() => AnswerLaunchUpdate(LaunchUpdateChoice.UpdateAndStart);
+    [RelayCommand] private void LaunchUpdateSkip() => AnswerLaunchUpdate(LaunchUpdateChoice.StartWithoutUpdate);
 
     public void Confirm(string title, string text, string button, Func<Task> action)
     {

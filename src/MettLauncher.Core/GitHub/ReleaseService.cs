@@ -55,7 +55,8 @@ public sealed partial class ReleaseService
 
     public static bool IsValidRepo(string? repo) => repo is not null && RepoRegex().IsMatch(repo);
 
-    public async Task<ReleaseListResult> GetReleasesAsync(string repo, CancellationToken ct = default)
+    /// <param name="revalidate">Auch Zwischenspeicher unterwegs (Proxy/CDN) sollen beim Server nachfragen (<c>Cache-Control: no-cache</c>).</param>
+    public async Task<ReleaseListResult> GetReleasesAsync(string repo, CancellationToken ct = default, bool revalidate = false)
     {
         if (!IsValidRepo(repo)) throw new ArgumentException($"Ungültiges Repo '{repo}', erwartet owner/name.", nameof(repo));
 
@@ -67,6 +68,7 @@ public sealed partial class ReleaseService
             using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(_apiBase, $"repos/{repo}/releases?per_page=100"));
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
             request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
+            if (revalidate) request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true };
             if (cache?.ETag is { } etag && EntityTagHeaderValue.TryParse(etag, out var parsed))
                 request.Headers.IfNoneMatch.Add(parsed);
 

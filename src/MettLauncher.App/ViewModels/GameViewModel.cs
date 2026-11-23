@@ -8,6 +8,7 @@ using MettLauncher.App.Services;
 using MettLauncher.Core.Catalog;
 using MettLauncher.Core.GitHub;
 using MettLauncher.Core.Install;
+using MettLauncher.Core.Launch;
 using MettLauncher.Core.News;
 using MettLauncher.Core.State;
 
@@ -23,6 +24,8 @@ public sealed partial class GameViewModel : ObservableObject
     private IReadOnlyList<ReleaseInfo> _releases = [];
     private NewsFeed _news = new();
     private CancellationTokenSource? _installCts;
+    /// <summary>Vom Klick auf „Spielen“ bis das Spiel läuft oder der Start abgebrochen ist.</summary>
+    private bool _launching;
 
     public GameViewModel(AppServices services, MainViewModel main, GameEntry entry)
     {
@@ -45,6 +48,7 @@ public sealed partial class GameViewModel : ObservableObject
     [ObservableProperty] public partial Bitmap? Cover { get; set; }
     [ObservableProperty] public partial Bitmap? Hero { get; set; }
     [ObservableProperty] public partial GamePhase Phase { get; set; } = GamePhase.Loading;
+    [ObservableProperty] public partial bool IsCheckingUpdate { get; set; }
     [ObservableProperty] public partial double Progress { get; set; }
     [ObservableProperty] public partial string ProgressText { get; set; } = "";
     [ObservableProperty] public partial string PercentText { get; set; } = "";
@@ -65,7 +69,7 @@ public sealed partial class GameViewModel : ObservableObject
     public bool HasActivity => Activity.Count > 0;
 
     // ---- Hauptbutton ----
-    public string PrimaryLabel => Phase switch
+    public string PrimaryLabel => IsCheckingUpdate ? "SUCHE NACH UPDATES …" : Phase switch
     {
         GamePhase.Loading => "LÄDT …",
         GamePhase.NotInstalled => "INSTALLIEREN",
@@ -73,16 +77,18 @@ public sealed partial class GameViewModel : ObservableObject
         GamePhase.Running => "BEENDEN",
         _ => "SPIELEN",
     };
-    public string PrimaryIcon => Phase switch
+    public string PrimaryIcon => IsCheckingUpdate ? "IconRefresh" : Phase switch
     {
         GamePhase.NotInstalled => "IconDownload",
         GamePhase.UpdateAvailable => "IconRefresh",
         GamePhase.Running => "IconStop",
         _ => "IconPlay",
     };
-    public bool PrimaryIsMuted => Phase is GamePhase.Running or GamePhase.Loading;
+    public bool PrimaryIsMuted => IsCheckingUpdate || Phase is GamePhase.Running or GamePhase.Loading;
     public bool ShowPrimary => Phase is not GamePhase.Installing;
-    public bool PrimaryFilledIcon => Phase is GamePhase.Ready;
+    public bool PrimaryFilledIcon => !IsCheckingUpdate && Phase is GamePhase.Ready;
+    /// <summary>Update bekannt: neben „Aktualisieren“ bleibt das Spiel startbar (mit Nachfrage).</summary>
+    public bool ShowSecondaryPlay => !IsCheckingUpdate && Phase is GamePhase.UpdateAvailable;
 
     // ---- Sidebar ----
     public string? SidebarStatus => Phase switch
@@ -95,9 +101,12 @@ public sealed partial class GameViewModel : ObservableObject
     public bool SidebarStatusIsHighlight => Phase == GamePhase.UpdateAvailable;
     public bool SidebarDimmed => Phase is GamePhase.NotInstalled or GamePhase.Loading;
 
-    partial void OnPhaseChanged(GamePhase value)
+    partial void OnPhaseChanged(GamePhase value) => NotifyPhase();
+    partial void OnIsCheckingUpdateChanged(bool value) => NotifyPhase();
+
+    private void NotifyPhase()
     {
-        foreach (var p in new[] { nameof(PrimaryLabel), nameof(PrimaryIcon), nameof(PrimaryIsMuted), nameof(ShowPrimary), nameof(PrimaryFilledIcon),
+        foreach (var p in new[] { nameof(PrimaryLabel), nameof(PrimaryIcon), nameof(PrimaryIsMuted), nameof(ShowPrimary), nameof(PrimaryFilledIcon), nameof(ShowSecondaryPlay),
                      nameof(SidebarStatus), nameof(SidebarStatusIsHighlight), nameof(SidebarDimmed), nameof(IsBusy), nameof(IsInstalled) })
             OnPropertyChanged(p);
     }
@@ -221,6 +230,7 @@ public sealed partial class GameViewModel : ObservableObject
     [RelayCommand]
     private async Task PrimaryAsync()
     {
+        if (_launching) return;
         switch (Phase)
         {
             case GamePhase.NotInstalled:
@@ -289,10 +299,10 @@ public sealed partial class GameViewModel : ObservableObject
     public void StartMultiplayer(string action, string? code)
     {
         if (Phase == GamePhase.Running) { _main.ShowError($"{Name} läuft bereits. Hosten/Beitreten bitte im Spiel oder nach dem Beenden."); return; }
-        if (Phase != GamePhase.Ready) { _main.ShowError($"{Name} muss zuerst installiert bzw. aktualisiert werden."); return; }
-        var env = _s.Net.GameEnvironment(Id, action, code);
-        if (env is null) { _main.ShowError(_s.Net.StartError ?? "Der Mehrspieler-Dienst ist noch nicht bereit."); return; }
-        _ = PlayAsync(env);
+        if (Phase == GamePhase.Installing) { _main.ShowError($"{Name} wird gerade installiert bzw. aktualisiert."); return; }
+        if (Phase is not (GamePhase.Ready or GamePhase.UpdateAvailable)) { _main.ShowError($"{Name} muss zuerst installiert werden."); return; }
+        if (_s.Net.GameEnvironment(Id, action, code) is null) { ShowNetNotReady(); return; }
+        _ = PlayAsync(action, code);
     }
 
     [RelayCommand]
@@ -301,13 +311,56 @@ public sealed partial class GameViewModel : ObservableObject
         if (SessionCode is not null) await _main.CopyAsync(SessionCode);
     }
 
-    private async Task PlayAsync(IReadOnlyDictionary<string, string>? env = null)
+    private void ShowNetNotReady() => _main.ShowError(_s.Net.StartError ?? "Der Mehrspieler-Dienst ist noch nicht bereit.");
+
+    [RelayCommand]
+    private Task StartGameAsync() => PlayAsync();
+
+    /// <summary>Einziger Startweg: erst nach Updates suchen und ggf. fragen, dann starten.</summary>
+    private async Task PlayAsync(string? action = null, string? code = null)
+    {
+        if (_launching || Phase is not (GamePhase.Ready or GamePhase.UpdateAvailable)) return;
+        _launching = true;
+        IsCheckingUpdate = true;
+        try
+        {
+            var start = await _s.LaunchGate.RunAsync(Entry, OnUpdateChecked,
+                (offer, error) => _main.AskLaunchUpdateAsync(Name, offer, error, multiplayer: action is not null),
+                release => InstallVersionAsync(release, reportError: false, closeDialogs: false));
+            if (start) await LaunchAsync(action, code);
+        }
+        catch (Exception ex)
+        {
+            _main.ShowError(ex.Message);
+        }
+        finally
+        {
+            IsCheckingUpdate = false;
+            _launching = false;
+        }
+    }
+
+    private bool OnUpdateChecked(LaunchUpdateCheck check)
+    {
+        IsCheckingUpdate = false;
+        if (check.Releases is { } fresh)
+        {
+            _releases = fresh;
+            Recompute();
+        }
+        // Während der Prüfung kann z. B. „Dateien überprüfen“ oder die Deinstallation gestartet worden sein.
+        return Phase is GamePhase.Ready or GamePhase.UpdateAvailable;
+    }
+
+    private async Task LaunchAsync(string? action, string? code)
     {
         try
         {
             // Unter Linux: Proton/umu beim ersten Start einrichten (Download mit Fortschritt unten).
             if (UsesProton && !await _main.EnsureProtonAsync()) return;
-            env ??= IsMultiplayer ? _s.Net.GameEnvironment(Id) : null;
+            // Erst jetzt holen: ein Update kann gedauert haben.
+            var env = IsMultiplayer || action is not null ? _s.Net.GameEnvironment(Id, action, code) : null;
+            if (env is null && action is not null) { ShowNetNotReady(); return; }
             var session = _s.Launcher.Launch(Entry, env);
             Phase = GamePhase.Running;
             LastPlayedText = "Jetzt";
@@ -371,11 +424,18 @@ public sealed partial class GameViewModel : ObservableObject
 
     public string? ProtonVersion => _s.Library.GetGame(Id)?.ProtonVersion;
 
-    public async Task InstallVersionAsync(ResolvedRelease release)
+    /// <param name="reportError">Fehler als Meldung anzeigen; sonst nur im Ergebnis zurückgeben.</param>
+    /// <param name="closeDialogs"><c>false</c> für automatische Updates: offene Dialoge stehen lassen.</param>
+    public async Task<LaunchUpdateResult> InstallVersionAsync(ResolvedRelease release, bool reportError = true, bool closeDialogs = true)
     {
-        if (Phase == GamePhase.Installing) return;
-        if (Phase == GamePhase.Running) { _main.ShowError($"{Name} läuft gerade. Bitte zuerst beenden."); return; }
-        _main.CloseDialogs();
+        if (Phase == GamePhase.Installing) return new LaunchUpdateResult(LaunchUpdateOutcome.Cancelled);
+        if (Phase == GamePhase.Running)
+        {
+            var running = $"{Name} läuft gerade. Bitte zuerst beenden.";
+            if (reportError) _main.ShowError(running);
+            return new LaunchUpdateResult(LaunchUpdateOutcome.Failed, running);
+        }
+        if (closeDialogs) _main.CloseDialogs();
         _installCts = new CancellationTokenSource();
         Phase = GamePhase.Installing;
         Progress = 0;
@@ -401,14 +461,17 @@ public sealed partial class GameViewModel : ObservableObject
         try
         {
             await _s.Installer.InstallAsync(Entry, release, progress, _installCts.Token);
+            return new LaunchUpdateResult(LaunchUpdateOutcome.Installed);
         }
         catch (OperationCanceledException)
         {
             // abgebrochen – alte Installation bleibt
+            return new LaunchUpdateResult(LaunchUpdateOutcome.Cancelled);
         }
         catch (Exception ex)
         {
-            _main.ShowError($"{Name}: {ex.Message}");
+            if (reportError) _main.ShowError($"{Name}: {ex.Message}");
+            return new LaunchUpdateResult(LaunchUpdateOutcome.Failed, ex.Message);
         }
         finally
         {
@@ -475,7 +538,8 @@ public sealed partial class GameViewModel : ObservableObject
     /// <summary>Automatisches Update beim Start, wenn eingeschaltet und das Spiel nicht festgepinnt ist.</summary>
     public async Task AutoUpdateIfNeededAsync()
     {
-        if (!_s.Settings.Current.AutoUpdate || Phase != GamePhase.UpdateAvailable || Status?.Latest is null) return;
-        await InstallVersionAsync(Status.Latest);
+        // Wird das Spiel gerade gestartet, entscheidet die Nachfrage vor dem Start.
+        if (_launching || !_s.Settings.Current.AutoUpdate || Phase != GamePhase.UpdateAvailable || Status?.Latest is null) return;
+        await InstallVersionAsync(Status.Latest, closeDialogs: false);
     }
 }

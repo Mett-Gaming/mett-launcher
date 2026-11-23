@@ -25,15 +25,25 @@
       <Border Background="{StaticResource BgSurface}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,0,0,1"
               Padding="32,14">
         <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto" ColumnSpacing="32">
-          <Button Grid.Column="0" Classes="play" Classes.muted="{Binding PrimaryIsMuted}"
-                  Command="{Binding PrimaryCommand}" IsVisible="{Binding ShowPrimary}"
-                  AutomationProperties.AutomationId="PrimaryAction" AutomationProperties.Name="{Binding PrimaryLabel}">
-            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-              <c:LucideIcon Width="20" Height="20" Data="{Binding PrimaryIcon, Converter={x:Static v:IconKeyConverter.Instance}}"
-                            Filled="{Binding PrimaryFilledIcon}" />
-              <TextBlock Text="{Binding PrimaryLabel}" FontWeight="Bold" FontSize="16" LetterSpacing="0.8" VerticalAlignment="Center" />
-            </StackPanel>
-          </Button>
+          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+            <Button Classes="play" Classes.muted="{Binding PrimaryIsMuted}"
+                    Command="{Binding PrimaryCommand}" IsVisible="{Binding ShowPrimary}"
+                    AutomationProperties.AutomationId="PrimaryAction" AutomationProperties.Name="{Binding PrimaryLabel}">
+              <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <c:LucideIcon Width="20" Height="20" Data="{Binding PrimaryIcon, Converter={x:Static v:IconKeyConverter.Instance}}"
+                              Filled="{Binding PrimaryFilledIcon}" />
+                <TextBlock Text="{Binding PrimaryLabel}" FontWeight="Bold" FontSize="16" LetterSpacing="0.8" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <!-- Update bekannt, trotzdem spielen (fragt vor dem Start nach) -->
+            <Button Classes="secondary" Height="48" Command="{Binding StartGameCommand}" IsVisible="{Binding ShowSecondaryPlay}"
+                    AutomationProperties.AutomationId="SecondaryPlay" AutomationProperties.Name="Spielen">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <c:LucideIcon Width="16" Height="16" Data="{StaticResource IconPlay}" Filled="True" />
+                <TextBlock Text="SPIELEN" FontWeight="Bold" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
 
           <!-- Download läuft -->
           <Border Grid.Column="0" IsVisible="{Binding IsBusy}" Width="260" Height="48" Background="{StaticResource BgRaised}"

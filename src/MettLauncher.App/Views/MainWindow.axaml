@@ -434,6 +434,24 @@
         </StackPanel>
       </Border>
 
+      <!-- Update vor dem Spielstart -->
+      <Border Classes="dialog" Width="540" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsLaunchUpdateOpen}">
+        <StackPanel Spacing="14">
+          <TextBlock Classes="h1" Text="Update verfügbar" />
+          <TextBlock Classes="body" Text="{Binding LaunchUpdatePromptText}" />
+          <TextBlock Classes="mono" FontSize="14" Foreground="{StaticResource TextPrimary}" Text="{Binding LaunchUpdateVersions}" />
+          <TextBlock Classes="caption" Text="{Binding LaunchUpdateHint}" TextWrapping="Wrap"
+                     IsVisible="{Binding LaunchUpdateHint, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <TextBlock Classes="caption" Foreground="{StaticResource Danger}" Text="{Binding LaunchUpdateError}" TextWrapping="Wrap"
+                     IsVisible="{Binding LaunchUpdateError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <Button Classes="ghost" Content="Abbrechen" Command="{Binding CloseDialogsCommand}" />
+            <Button Classes="secondary" Content="Ohne Update starten" Command="{Binding LaunchUpdateSkipCommand}" />
+            <Button Classes="primary" Content="Aktualisieren und starten" Command="{Binding LaunchUpdateAcceptCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
       <!-- Bestätigen -->
       <Border Classes="dialog" Width="440" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsConfirmOpen}">
         <StackPanel Spacing="16">
