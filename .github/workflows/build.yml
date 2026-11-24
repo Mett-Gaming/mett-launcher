@@ -50,7 +50,7 @@ jobs:
         working-directory: native
         run: |
           cargo test --workspace
-          cargo build --release -p mett-netd
+          cargo build --release -p mett-netd -p mett-overlay
 
       - name: Tests
         run: dotnet test -c Release
@@ -107,7 +107,7 @@ jobs:
         working-directory: native
         run: |
           cargo test --workspace
-          cargo build --release -p mett-netd
+          cargo build --release -p mett-netd -p mett-overlay
 
       - name: Tests
         run: dotnet test -c Release
