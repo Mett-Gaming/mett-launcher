@@ -71,6 +71,12 @@ public sealed class PresenceServer : IDisposable
     /// <summary>Spiel-Id und neuer Status (<c>null</c> = Verbindung weg). Auf einem Hintergrund-Thread.</summary>
     public event Action<string, GamePresence?>? Changed;
 
+    /// <summary>
+    /// Erfolg gemeldet: Spiel, Id, Fortschritt (<c>null</c> = freischalten). <c>true</c> = verarbeitet, das Spiel
+    /// bekommt dann eine Bestätigung und meldet es nicht noch einmal.
+    /// </summary>
+    public Func<string, string, int?, bool>? Achievement { get; set; }
+
     public bool IsRunning => _listener is not null;
 
     /// <summary>Startet den Empfang; klappt es nicht, bleibt der Dienst aus.</summary>
@@ -128,6 +134,7 @@ public sealed class PresenceServer : IDisposable
     private async Task ServeAsync(TcpClient client)
     {
         string? game = null, token = null;
+        var budget = new ReportBudget();
         using (client)
         {
             try
@@ -146,7 +153,9 @@ public sealed class PresenceServer : IDisposable
                         var line = Encoding.UTF8.GetString(buffer, 0, end);
                         Buffer.BlockCopy(buffer, end + 1, buffer, 0, used - end - 1);
                         used -= end + 1;
-                        if (!Handle(line, ref game, ref token)) return;
+                        if (!Handle(line, ref game, ref token, budget, out var ack)) return;
+                        if (ack is { } n)
+                            await stream.WriteAsync(Encoding.UTF8.GetBytes($"{{\"ack\":{n}}}\n"), _stop.Token).ConfigureAwait(false);
                     }
                     if (used == buffer.Length) return; // Zeile zu lang
                 }
@@ -164,8 +173,9 @@ public sealed class PresenceServer : IDisposable
     }
 
     /// <returns><c>false</c> = Verbindung trennen.</returns>
-    private bool Handle(string line, ref string? game, ref string? token)
+    private bool Handle(string line, ref string? game, ref string? token, ReportBudget budget, out long? ack)
     {
+        ack = null;
         if (string.IsNullOrWhiteSpace(line)) return true;
         try
         {
@@ -178,13 +188,44 @@ public sealed class PresenceServer : IDisposable
                 token = json.TryGetProperty("token", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() : null;
                 if (token is null || !_tokens.TryGetValue(token, out game)) { game = null; return false; }
             }
-            else if (!_tokens.ContainsKey(token!)) return false; // Spiel beendet
+            // Erfolge zählen auch noch, wenn das Spiel gerade beendet wurde.
+            if (Text(json, "unlock") is { } unlock) return Report(game, json, unlock, null, budget, out ack);
+            if (Text(json, "progress") is { } progress)
+                return Report(game, json, progress, json.TryGetProperty("value", out var v) ? v.TryGetInt32OrNull() ?? 0 : 0, budget, out ack);
+            if (!_tokens.ContainsKey(token!)) return false; // Spiel beendet
             Changed?.Invoke(game, GamePresence.From(json));
             return true;
         }
         catch (JsonException)
         {
             return game is not null; // kaputte Meldung überspringen
+        }
+    }
+
+    private static string? Text(JsonElement json, string key) =>
+        json.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+
+    private bool Report(string game, JsonElement json, string id, int? value, ReportBudget budget, out long? ack)
+    {
+        ack = null;
+        if (!budget.Take()) return true; // zu viele auf einmal: ohne Bestätigung, das Spiel meldet sie später noch einmal
+        // Ungültige Ids werden bestätigt, sonst kämen sie immer wieder.
+        var done = !Achievements.AchievementDefinitions.IsId(id) || (Achievement?.Invoke(game, id, value) ?? false);
+        if (done && json.TryGetProperty("n", out var n) && n.ValueKind == JsonValueKind.Number && n.TryGetInt64(out var number))
+            ack = number;
+        return true;
+    }
+
+    /// <summary>Höchstens 300 Erfolgsmeldungen in zehn Sekunden je Verbindung.</summary>
+    private sealed class ReportBudget
+    {
+        private long _start = Environment.TickCount64;
+        private int _used;
+
+        public bool Take()
+        {
+            if (Environment.TickCount64 - _start > 10_000) (_start, _used) = (Environment.TickCount64, 0);
+            return ++_used <= 300;
         }
     }
 

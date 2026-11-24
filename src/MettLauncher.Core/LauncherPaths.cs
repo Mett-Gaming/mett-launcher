@@ -34,6 +34,8 @@ public sealed record LauncherPaths(string Root)
     public string ToolsDir => Path.Combine(Root, "tools");
     public string LogDir => Path.Combine(Root, "logs");
     public string NetDir => Path.Combine(Root, "net");
+    /// <summary>Erfolge ohne Konto.</summary>
+    public string LocalProfileDir => Path.Combine(Root, "profiles", "local");
     public string LibraryFile => Path.Combine(Root, "library.json");
     public string SettingsFile => Path.Combine(Root, "settings.json");
     public string DefaultGamesDir => Path.Combine(Root, "games");
