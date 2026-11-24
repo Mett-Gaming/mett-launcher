@@ -282,8 +282,7 @@ public sealed class AchievementTests : IDisposable
         using (var client = new TcpClient())
         {
             await client.ConnectAsync(IPEndPoint.Parse(env[PresenceServer.AddressVariable]));
-            var w = new StreamWriter(client.GetStream(), new UTF8Encoding(false)) { AutoFlush = true, NewLine = "
-" };
+            var w = new StreamWriter(client.GetStream(), new UTF8Encoding(false)) { AutoFlush = true, NewLine = "\n" };
             var r = new StreamReader(client.GetStream());
             await w.WriteLineAsync($$"""{"token":"{{env[PresenceServer.TokenVariable]}}","link":1}""");
             await w.WriteLineAsync("""{"overlay":"toggle"}""");
