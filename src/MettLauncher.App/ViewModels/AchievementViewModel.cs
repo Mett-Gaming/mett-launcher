@@ -32,6 +32,7 @@ public sealed class AchievementViewModel
     public double Fraction { get; }
     public bool ShowProgress { get; }
     public string Info { get; }
+    public string Tip => Text.Length > 0 ? $"{Name}\n{Text}" : Name;
     public DateTimeOffset? UnlockedAt { get; }
 
     /// <summary>Alle Erfolge eines Spiels, zuletzt freigeschaltete zuerst.</summary>

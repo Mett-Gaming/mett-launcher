@@ -24,7 +24,7 @@
       <!-- Spielen-Leiste -->
       <Border Background="{StaticResource BgSurface}" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,0,0,1"
               Padding="32,14">
-        <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto" ColumnSpacing="32">
+        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto" ColumnSpacing="20">
           <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
             <Button Classes="play" Classes.muted="{Binding PrimaryIsMuted}"
                     Command="{Binding PrimaryCommand}" IsVisible="{Binding ShowPrimary}"
@@ -67,12 +67,27 @@
             <TextBlock Classes="overline" Text="SPIELZEIT" />
             <TextBlock Text="{Binding PlaytimeText}" FontWeight="Medium" Foreground="{StaticResource TextSecondary}" />
           </StackPanel>
+          <Panel Grid.Column="3" x:Name="AchievementsStat">
+          <Button Classes="ghost" Padding="6,4" IsVisible="{Binding HasAchievements}" Command="{Binding ShowAchievementsCommand}"
+                  ToolTip.Tip="Alle Erfolge anzeigen" AutomationProperties.Name="Alle Erfolge anzeigen" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <c:LucideIcon Width="20" Height="20" Data="{StaticResource IconTrophy}" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" />
+              <StackPanel Spacing="4">
+                <TextBlock Classes="overline" Text="ERFOLGE" HorizontalAlignment="Left" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="{Binding AchievementsShort}" FontWeight="Medium" Foreground="{StaticResource TextSecondary}" />
+                  <ProgressBar Width="80" MinWidth="80" Value="{Binding AchievementsFraction}" Maximum="1" VerticalAlignment="Center" />
+                </StackPanel>
+              </StackPanel>
+            </StackPanel>
+          </Button>
+          </Panel>
 
-          <Button Grid.Column="3" Classes="secondary" HorizontalAlignment="Right" Height="40" IsVisible="{Binding IsMultiplayer}"
+          <Button Grid.Column="4" Classes="secondary" HorizontalAlignment="Right" Height="40" IsVisible="{Binding IsMultiplayer}"
                   AutomationProperties.Name="Mit Freunden spielen">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <c:LucideIcon Width="16" Height="16" Data="{StaticResource IconUsers}" />
-              <TextBlock Text="Mit Freunden spielen" VerticalAlignment="Center" />
+              <TextBlock Text="Mit Freunden" VerticalAlignment="Center" />
             </StackPanel>
             <Button.Flyout>
               <MenuFlyout Placement="BottomEdgeAlignedRight">
@@ -82,7 +97,7 @@
             </Button.Flyout>
           </Button>
 
-          <Button Grid.Column="4" Classes="icon" ToolTip.Tip="Verwalten" AutomationProperties.Name="Verwalten">
+          <Button Grid.Column="5" Classes="icon" ToolTip.Tip="Verwalten" AutomationProperties.Name="Verwalten">
             <c:LucideIcon Width="18" Height="18" Data="{StaticResource IconSettings}" />
             <Button.Flyout>
               <MenuFlyout Placement="BottomEdgeAlignedRight">
@@ -100,7 +115,7 @@
               </MenuFlyout>
             </Button.Flyout>
           </Button>
-          <Button Grid.Column="5" Classes="icon" ToolTip.Tip="Auf GitHub ansehen" AutomationProperties.Name="Auf GitHub ansehen" Command="{Binding OpenRepoCommand}">
+          <Button Grid.Column="6" Classes="icon" ToolTip.Tip="Auf GitHub ansehen" AutomationProperties.Name="Auf GitHub ansehen" Command="{Binding OpenRepoCommand}">
             <c:LucideIcon Width="18" Height="18" Data="{StaticResource IconInfo}" />
           </Button>
         </Grid>
@@ -127,47 +142,6 @@
       <!-- Aktivität | Info -->
       <Grid ColumnDefinitions="*,272" ColumnSpacing="32" Margin="32,24">
         <StackPanel Spacing="12">
-          <!-- Erfolge -->
-          <StackPanel Spacing="10" IsVisible="{Binding HasAchievements}" Margin="0,0,0,12">
-            <Border Classes="sectionhead">
-              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                <TextBlock Classes="overline" Text="ERFOLGE" />
-                <TextBlock Grid.Column="1" Classes="caption" Text="{Binding AchievementsText}" VerticalAlignment="Center" />
-              </Grid>
-            </Border>
-            <ProgressBar Value="{Binding AchievementsFraction}" Maximum="1" />
-            <ItemsControl ItemsSource="{Binding Achievements}">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:AchievementViewModel">
-                  <Border Classes="card" Padding="10">
-                    <Grid ColumnDefinitions="44,*,Auto" ColumnSpacing="12">
-                      <Border Width="44" Height="44" CornerRadius="3" ClipToBounds="True" Background="{StaticResource BgSelected}">
-                        <Panel>
-                          <Image Source="{Binding Icon}" Stretch="UniformToFill" Opacity="{Binding IconOpacity}" IsVisible="{Binding HasIcon}" />
-                          <Panel IsVisible="{Binding !HasIcon}">
-                            <c:LucideIcon Width="22" Height="22" Data="{StaticResource IconTrophy}" Foreground="{StaticResource Brand}" IsVisible="{Binding Unlocked}"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            <c:LucideIcon Width="22" Height="22" Data="{StaticResource IconLock}" Foreground="{StaticResource TextMuted}" IsVisible="{Binding !Unlocked}"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
-                          </Panel>
-                        </Panel>
-                      </Border>
-                      <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                        <TextBlock Classes="caption" Text="{Binding Text}" TextWrapping="Wrap" />
-                        <ProgressBar Value="{Binding Fraction}" Maximum="1" IsVisible="{Binding ShowProgress}" />
-                      </StackPanel>
-                      <TextBlock Grid.Column="2" Classes="caption" Text="{Binding Info}" VerticalAlignment="Center" />
-                    </Grid>
-                  </Border>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </StackPanel>
-
           <Border Classes="sectionhead"><TextBlock Classes="overline" Text="AKTIVITÄT" /></Border>
           <TextBlock Classes="body" Text="Noch keine Meldungen zu diesem Spiel." IsVisible="{Binding !HasActivity}" />
           <ItemsControl ItemsSource="{Binding Activity}">
@@ -202,6 +176,72 @@
         </StackPanel>
 
         <StackPanel Grid.Column="1" Spacing="10">
+          <!-- Erfolge -->
+          <StackPanel Spacing="10" IsVisible="{Binding HasAchievements}" Margin="0,0,0,14">
+            <Border Classes="sectionhead"><TextBlock Classes="overline" Text="ERFOLGE" /></Border>
+            <Border Classes="card" Padding="12">
+              <StackPanel Spacing="10">
+              <TextBlock Text="{Binding AchievementsText}" FontWeight="SemiBold" FontSize="13" />
+              <ProgressBar Value="{Binding AchievementsFraction}" Maximum="1" />
+              <Grid ColumnDefinitions="44,*" ColumnSpacing="10" IsVisible="{Binding HasLatestAchievement}">
+                <Border Width="44" Height="44" CornerRadius="3" ClipToBounds="True" Background="{StaticResource BgSelected}">
+                  <Panel>
+                    <Image Source="{Binding LatestAchievement.Icon, FallbackValue={x:Null}}" Stretch="UniformToFill" />
+                    <c:LucideIcon Width="22" Height="22" Data="{StaticResource IconTrophy}" Foreground="{StaticResource Brand}"
+                                  IsVisible="{Binding !LatestAchievement.HasIcon, FallbackValue=False}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Panel>
+                </Border>
+                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding LatestAchievement.Name, FallbackValue=''}" FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap" />
+                  <TextBlock Classes="caption" Text="{Binding LatestAchievement.Text, FallbackValue=''}" TextWrapping="Wrap" />
+                </StackPanel>
+              </Grid>
+              <ItemsControl ItemsSource="{Binding UnlockedPreview}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:AchievementViewModel">
+                    <Border Width="38" Height="38" Margin="0,0,4,4" CornerRadius="3" ClipToBounds="True" Background="{StaticResource BgSelected}" ToolTip.Tip="{Binding Tip}">
+                      <Panel>
+                        <Image Source="{Binding Icon}" Stretch="UniformToFill" Opacity="{Binding IconOpacity}" IsVisible="{Binding HasIcon}" />
+                        <Panel IsVisible="{Binding !HasIcon}">
+                          <c:LucideIcon Width="18" Height="18" Data="{StaticResource IconTrophy}" Foreground="{StaticResource Brand}" IsVisible="{Binding Unlocked}"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
+                          <c:LucideIcon Width="18" Height="18" Data="{StaticResource IconLock}" Foreground="{StaticResource TextMuted}" IsVisible="{Binding !Unlocked}"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Panel>
+                      </Panel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Classes="caption" Text="Noch offen" IsVisible="{Binding HasOpenAchievements}" />
+              <ItemsControl ItemsSource="{Binding OpenPreview}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:AchievementViewModel">
+                    <Border Width="38" Height="38" Margin="0,0,4,4" CornerRadius="3" ClipToBounds="True" Background="{StaticResource BgSelected}" ToolTip.Tip="{Binding Tip}">
+                      <Panel>
+                        <Image Source="{Binding Icon}" Stretch="UniformToFill" Opacity="{Binding IconOpacity}" IsVisible="{Binding HasIcon}" />
+                        <Panel IsVisible="{Binding !HasIcon}">
+                          <c:LucideIcon Width="18" Height="18" Data="{StaticResource IconTrophy}" Foreground="{StaticResource Brand}" IsVisible="{Binding Unlocked}"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
+                          <c:LucideIcon Width="18" Height="18" Data="{StaticResource IconLock}" Foreground="{StaticResource TextMuted}" IsVisible="{Binding !Unlocked}"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Panel>
+                      </Panel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <Button Classes="link" Content="{Binding ShowAllAchievementsText}" Command="{Binding ShowAchievementsCommand}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
           <Border Classes="sectionhead"><TextBlock Classes="overline" Text="INFO" /></Border>
           <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
             <TextBlock Classes="caption" Text="Entwickler" />

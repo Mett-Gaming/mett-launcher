@@ -74,6 +74,17 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Von der View gesetzt: in den Hintergrund bzw. beenden.</summary>
     public Action<bool>? LeaveWindow { get; set; }
 
+    // ---- Dialog „Alle Erfolge“ ----
+    [ObservableProperty] public partial GameViewModel? AchievementsGame { get; set; }
+    public bool IsAchievementsOpen => AchievementsGame is not null;
+    partial void OnAchievementsGameChanged(GameViewModel? value) { OnPropertyChanged(nameof(IsAchievementsOpen)); OnPropertyChanged(nameof(IsAnyDialogOpen)); }
+
+    public void OpenAchievements(GameViewModel game)
+    {
+        CloseDialogs();
+        AchievementsGame = game;
+    }
+
     [ObservableProperty] public partial bool IsLeaveDialogOpen { get; set; }
     [ObservableProperty] public partial bool RememberLeave { get; set; }
     partial void OnIsLeaveDialogOpenChanged(bool value) => OnPropertyChanged(nameof(IsAnyDialogOpen));
@@ -397,7 +408,7 @@ public sealed partial class MainViewModel : ObservableObject
     public bool HasDownload => ActiveDownload is not null;
     public bool ShowIdleDownloads => !HasDownload && !HasToolDownload;
     public bool IsVersionDialogOpen => VersionDialogGame is not null;
-    public bool IsAnyDialogOpen => IsVersionDialogOpen || IsConfirmOpen || IsJoinDialogOpen || IsNameDialogOpen || IsProtonDialogOpen || IsLaunchUpdateOpen || IsLeaveDialogOpen;
+    public bool IsAnyDialogOpen => IsVersionDialogOpen || IsConfirmOpen || IsJoinDialogOpen || IsNameDialogOpen || IsProtonDialogOpen || IsLaunchUpdateOpen || IsLeaveDialogOpen || IsAchievementsOpen;
     public bool HasNews => NewsItems.Count > 0;
     public string GamesHeader => $"({Games.Count})";
     public string LauncherUpdateText => $"Mett Launcher {PendingLauncherVersion} ist bereit. Neustarten, um das Update abzuschließen.";
@@ -626,6 +637,7 @@ public sealed partial class MainViewModel : ObservableObject
         ProtonDialogGame = null;
         IsNameDialogOpen = false;
         IsLeaveDialogOpen = false;
+        AchievementsGame = null;
         _afterName = null;
         IsConfirmOpen = false;
         _confirmAction = null;

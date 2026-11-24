@@ -20,7 +20,9 @@ public sealed class AppServices : IDisposable
     {
         Paths = LauncherPaths.Default();
         // Bis v0.3.0 lagen die Daten im Velopack-Installordner -> einmalig umziehen, bevor etwas geladen wird.
-        Migration = LegacyDataMigration.Run(Paths, LauncherPaths.LegacyRoot);
+        // Ein eigener Ordner zum Ausprobieren darf die echten Daten nicht anfassen.
+        Migration = Environment.GetEnvironmentVariable("METT_LAUNCHER_ROOT") is { Length: > 0 }
+            ? new MigrationResult(false, [], []) : LegacyDataMigration.Run(Paths, LauncherPaths.LegacyRoot);
         Http = MettHttp.CreateClient();
         Settings = new SettingsStore(Paths);
         Library = new LibraryStore(Paths);

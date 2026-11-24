@@ -16,7 +16,9 @@ public sealed record LauncherPaths(string Root)
 {
     public static string LocalAppData => Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
 
-    public static LauncherPaths Default() => new(Path.Combine(LocalAppData, "MettGaming", "Launcher"));
+    /// <summary><c>METT_LAUNCHER_ROOT</c> verlegt den Ordner (zum Ausprobieren ohne die eigenen Daten).</summary>
+    public static LauncherPaths Default() => new(Environment.GetEnvironmentVariable("METT_LAUNCHER_ROOT") is { Length: > 0 } root
+        ? Path.GetFullPath(root) : Path.Combine(LocalAppData, "MettGaming", "Launcher"));
 
     /// <summary>Datenordner bis v0.3.0 (gleichzeitig Velopack-Installordner).</summary>
     public static string LegacyRoot => Path.Combine(LocalAppData, "MettLauncher");

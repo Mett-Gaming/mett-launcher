@@ -49,17 +49,32 @@ public sealed partial class GameViewModel : ObservableObject, IOverlayGame
     [ObservableProperty] public partial IReadOnlyList<AchievementViewModel> Achievements { get; set; } = [];
     public bool HasAchievements => Achievements.Count > 0;
     public int AchievementsUnlocked => Achievements.Count(a => a.Unlocked);
-    public string AchievementsText => $"{AchievementsUnlocked} von {Achievements.Count}";
+    public string AchievementsText => $"Freigeschaltet: {AchievementsUnlocked}/{Achievements.Count} ({Math.Floor(AchievementsFraction * 100):0} %)";
+    public string AchievementsShort => $"{AchievementsUnlocked}/{Achievements.Count}";
+    /// <summary>Zuletzt freigeschaltet (die Liste ist danach sortiert).</summary>
+    public AchievementViewModel? LatestAchievement => Achievements.FirstOrDefault(a => a.Unlocked);
+    public bool HasLatestAchievement => LatestAchievement is not null;
+    public bool HasOpenAchievements => AchievementsUnlocked < Achievements.Count;
+    public IEnumerable<AchievementViewModel> UnlockedPreview => Achievements.Where(a => a.Unlocked).Skip(1).Take(10);
+    public IEnumerable<AchievementViewModel> OpenPreview => Achievements.Where(a => !a.Unlocked).Take(10);
+    public string ShowAllAchievementsText => Achievements.Count - UnlockedPreview.Count() - OpenPreview.Count() - (HasLatestAchievement ? 1 : 0) is > 0 and var rest
+        ? $"Alle anzeigen (+{rest})" : "Alle anzeigen";
+    [RelayCommand] private void ShowAchievements() => _main.OpenAchievements(this);
     public double AchievementsFraction => HasAchievements ? (double)AchievementsUnlocked / Achievements.Count : 0;
     partial void OnAchievementsChanged(IReadOnlyList<AchievementViewModel> value)
     {
-        foreach (var p in new[] { nameof(HasAchievements), nameof(AchievementsUnlocked), nameof(AchievementsText), nameof(AchievementsFraction), nameof(SidebarCount) })
+        foreach (var p in new[] { nameof(HasAchievements), nameof(AchievementsUnlocked), nameof(AchievementsText), nameof(AchievementsShort), nameof(AchievementsFraction), nameof(LatestAchievement),
+                     nameof(HasLatestAchievement), nameof(HasOpenAchievements), nameof(UnlockedPreview), nameof(OpenPreview), nameof(ShowAllAchievementsText), nameof(SidebarCount) })
             OnPropertyChanged(p);
     }
     /// <summary>Zähler in der Bibliothek, wenn dort sonst nichts steht.</summary>
     public string? SidebarCount => SidebarStatus is null && HasAchievements && !SidebarDimmed ? $"{AchievementsUnlocked}/{Achievements.Count}" : null;
 
-    public void RefreshAchievements() => Achievements = AchievementViewModel.All(_s.Achievements.Definitions(Id), _s.Achievements.States(Id));
+    public void RefreshAchievements()
+    {
+        Achievements = AchievementViewModel.All(_s.Achievements.Definitions(Id), _s.Achievements.States(Id));
+        RebuildActivity();
+    }
 
     public TimeSpan TotalPlaytime => _s.Library.GetGame(Id)?.TotalPlaytime ?? TimeSpan.Zero;
 
@@ -206,7 +221,6 @@ public sealed partial class GameViewModel : ObservableObject, IOverlayGame
                 isInstalled: string.Equals(r.Tag, installedTag, StringComparison.OrdinalIgnoreCase),
                 isPinned: string.Equals(r.Tag, state?.PinnedTag, StringComparison.OrdinalIgnoreCase)));
 
-        RebuildActivity();
         _s.Achievements.Reload(Id);
         RefreshAchievements();
         OnPropertyChanged(nameof(IsInstalled));
@@ -240,6 +254,14 @@ public sealed partial class GameViewModel : ObservableObject, IOverlayGame
                 Url = r.HtmlUrl,
             });
         }
+        foreach (var day in Achievements.Where(a => a.Unlocked).GroupBy(a => a.UnlockedAt!.Value.ToLocalTime().Date))
+            items.Add(new ActivityItemViewModel
+            {
+                Date = day.Max(a => a.UnlockedAt!.Value),
+                Kind = "ERFOLGE",
+                Title = day.Count() == 1 ? "Erfolg freigeschaltet" : $"{day.Count()} Erfolge freigeschaltet",
+                Lines = [.. day.Take(6).Select(a => a.Name), .. day.Count() > 6 ? [$"und {day.Count() - 6} weitere"] : Array.Empty<string>()],
+            });
         Activity.Clear();
         foreach (var i in items.OrderByDescending(i => i.Date).Take(12)) Activity.Add(i);
         OnPropertyChanged(nameof(HasActivity));

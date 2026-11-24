@@ -532,6 +532,48 @@
         </StackPanel>
       </Border>
 
+      <!-- Alle Erfolge -->
+      <Border Classes="dialog" Width="680" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsAchievementsOpen}">
+        <StackPanel Spacing="12">
+          <TextBlock Classes="h1" Text="{Binding AchievementsGame.Name, StringFormat='{}{0} – Erfolge', FallbackValue=''}" />
+          <TextBlock Classes="body" Text="{Binding AchievementsGame.AchievementsText, FallbackValue=''}" />
+          <ProgressBar Value="{Binding AchievementsGame.AchievementsFraction, FallbackValue=0}" Maximum="1" />
+          <ScrollViewer MaxHeight="440">
+            <ItemsControl ItemsSource="{Binding AchievementsGame.Achievements, FallbackValue={x:Null}}" Margin="0,0,14,0">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:AchievementViewModel">
+                  <Border Classes="card" Padding="10">
+                    <Grid ColumnDefinitions="44,*,Auto" ColumnSpacing="12">
+                      <Border Width="44" Height="44" CornerRadius="3" ClipToBounds="True" Background="{StaticResource BgSelected}">
+                        <Panel>
+                          <Image Source="{Binding Icon}" Stretch="UniformToFill" Opacity="{Binding IconOpacity}" IsVisible="{Binding HasIcon}" />
+                          <Panel IsVisible="{Binding !HasIcon}">
+                            <c:LucideIcon Width="22" Height="22" Data="{StaticResource IconTrophy}" Foreground="{StaticResource Brand}" IsVisible="{Binding Unlocked}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <c:LucideIcon Width="22" Height="22" Data="{StaticResource IconLock}" Foreground="{StaticResource TextMuted}" IsVisible="{Binding !Unlocked}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                          </Panel>
+                        </Panel>
+                      </Border>
+                      <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Classes="caption" Text="{Binding Text}" TextWrapping="Wrap" />
+                        <ProgressBar Value="{Binding Fraction}" Maximum="1" IsVisible="{Binding ShowProgress}" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Classes="caption" Text="{Binding Info}" VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+          <Button Classes="secondary" Content="Schließen" HorizontalAlignment="Right" Command="{Binding CloseDialogsCommand}" />
+        </StackPanel>
+      </Border>
+
       <!-- Schließen, während ein Spiel läuft -->
       <Border Classes="dialog" Width="540" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsLeaveDialogOpen}">
         <StackPanel Spacing="14">

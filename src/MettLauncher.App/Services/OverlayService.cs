@@ -124,7 +124,8 @@ public sealed class OverlayService
 
     private void OnStats(string id, OverlayStats stats)
     {
-        if (!_games.TryGetValue(id, out var g)) return;
+        // Ganz am Anfang gibt es noch kein Bild.
+        if (stats.Height <= 0 || !_games.TryGetValue(id, out var g)) return;
         // Andere Größe: alles in passender Schärfe neu zeichnen
         if (g.Stats?.Height != stats.Height) g.BarText = g.PanelKey = "";
         g.Stats = stats;
