@@ -58,6 +58,9 @@ schicken per TCP eine JSON-Zeile je Änderung, die erste mit Token:
 
 Alle Felder außer `token` sind optional. Mettgine-Spiele nutzen dafür `mettgine::presence`.
 
+## Kleine Aktualisierungen
+Liegt neben dem Zip eine Dateiliste (`<Zip ohne .zip>.dateien.json`, erzeugt von `mettpack` in der Engine), übernimmt der Launcher alles Gleiche aus der vorhandenen Installation und lädt nur den Rest als Teilabruf aus dem Zip. Jede Datei wird geprüft; bei Problemen kommt das ganze Zip.
+
 ## Erfolge und Overlay
 Spiele bringen `erfolge/erfolge.json` mit und melden über die lokale Verbindung, was erreicht ist. Der Launcher speichert (`profiles/local/achievements/`), zeigt Erfolge auf der Spielseite und blendet sie im Spiel ein. Dafür lädt der Vulkan-Lader in vom Launcher gestarteten Spielen die Schicht `native/mett-overlay`; sie zeichnet nur fertige Bilder des Launchers. Die Anleitung für Spiele liegt in der Engine: [docs/erfolge.md](https://github.com/Mett-Gaming/mettgine/blob/main/docs/erfolge.md). Zum Ausprobieren ohne die eigenen Daten: `METT_LAUNCHER_ROOT=<Ordner>`.
 
