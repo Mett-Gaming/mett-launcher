@@ -1,0 +1,14 @@
+{
+  "file_format_version": "1.2.0",
+  "layer": {
+    "name": "VK_LAYER_METT_overlay",
+    "type": "GLOBAL",
+    "library_path": "@LIBRARY@",
+    "api_version": "1.4.0",
+    "implementation_version": "1",
+    "description": "Overlay des Mett Launchers",
+    "functions": {
+      "vkNegotiateLoaderLayerInterfaceVersion": "vkNegotiateLoaderLayerInterfaceVersion"
+    }
+  }
+}

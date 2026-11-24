@@ -1,0 +1,23 @@
+[package]
+name = "mett-overlay"
+description = "Overlay des Mett Launchers als Vulkan-Schicht"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# nur Typen und Funktionstabellen, kein eigener Lader
+ash = { version = "0.38", default-features = false, features = ["std"] }
+
+[build-dependencies]
+naga = { version = "24", features = ["wgsl-in", "spv-out"] }
+
+[dev-dependencies]
+ash = { version = "0.38", features = ["loaded"] }
+ash-window = "0.13"
+raw-window-handle = "0.6"
+winit = "0.30"

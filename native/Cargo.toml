@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["mett-net-proto", "mett-net", "mett-netd"]
+members = ["mett-net-proto", "mett-net", "mett-netd", "mett-overlay"]
 
 [workspace.package]
 version = "0.2.1"
