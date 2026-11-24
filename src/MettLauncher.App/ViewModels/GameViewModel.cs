@@ -500,6 +500,7 @@ public sealed partial class GameViewModel : ObservableObject, IOverlayGame
                     ProgressText = p.TotalBytes is { } t
                         ? $"{Formatting.Size(p.BytesReceived)} / {Formatting.Size(t)}"
                         : Formatting.Size(p.BytesReceived);
+                    if (p.FullBytes is { } full) ProgressText += $" (statt {Formatting.Size(full)})";
                     break;
                 case InstallPhase.Verifying: ProgressText = "Prüfsumme wird geprüft …"; break;
                 case InstallPhase.Extracting: ProgressText = "Wird entpackt …"; break;

@@ -14,6 +14,9 @@ public enum InstallPhase { Downloading, Verifying, Extracting, Finalizing, Compl
 /// <param name="TotalBytes">Gesamtgröße, falls bekannt (sonst <c>null</c>).</param>
 public sealed record InstallProgress(InstallPhase Phase, long BytesReceived, long? TotalBytes)
 {
+    /// <summary>Größe des ganzen Pakets, wenn nur Geändertes geladen wird.</summary>
+    public long? FullBytes { get; init; }
+
     /// <summary>0..1 für den Download, sonst <c>null</c>.</summary>
     public double? Fraction => TotalBytes is > 0 ? Math.Clamp((double)BytesReceived / TotalBytes.Value, 0, 1) : null;
 }
@@ -23,7 +26,8 @@ public sealed record InstallResult(string InstallPath, SemVersion Version, strin
 public sealed class InstallException(string message, Exception? inner = null) : Exception(message, inner);
 
 /// <summary>
-/// Download → sha256 → Entpacken in Staging → preserve übernehmen → atomarer Ordnertausch → State.
+/// Download → sha256 → Entpacken in Staging → preserve übernehmen → atomarer Ordnertausch → State. Gibt es eine Dateiliste und
+/// eine Installation, wird nur Geändertes geladen (<see cref="DeltaInstaller"/>).
 /// Bei Fehler oder Abbruch bleibt eine vorhandene Installation unverändert.
 /// </summary>
 public sealed class InstallService
@@ -89,16 +93,27 @@ public sealed class InstallService
         Directory.CreateDirectory(staging);
         try
         {
-            var sha = await DownloadAsync(release.Asset, zipPath, progress, ct).ConfigureAwait(false);
-
-            progress?.Report(new InstallProgress(InstallPhase.Verifying, 0, null));
             var expected = release.Asset.Sha256;
-            if (expected is not null && !string.Equals(expected, sha, StringComparison.OrdinalIgnoreCase))
-                throw new InstallException($"Prüfsumme stimmt nicht (erwartet {expected}, erhalten {sha}). Download verworfen.");
+            var delta = game.StripTopFolder && await new DeltaInstaller(_http, ProgressGranularityBytes)
+                .TryAsync(release, installDir, staging, content, progress, ct).ConfigureAwait(false);
+            string? sha;
+            if (delta)
+            {
+                sha = expected; // jede Datei einzeln geprüft
+            }
+            else
+            {
+                FileSystemUtil.TryDeleteDirectory(content); // Reste eines abgebrochenen Zusammensetzens
+                sha = await DownloadAsync(release.Asset, zipPath, progress, ct).ConfigureAwait(false);
 
-            ct.ThrowIfCancellationRequested();
-            progress?.Report(new InstallProgress(InstallPhase.Extracting, 0, null));
-            await Task.Run(() => Extract(zipPath, content, game.StripTopFolder, ct), ct).ConfigureAwait(false);
+                progress?.Report(new InstallProgress(InstallPhase.Verifying, 0, null));
+                if (expected is not null && !string.Equals(expected, sha, StringComparison.OrdinalIgnoreCase))
+                    throw new InstallException($"Prüfsumme stimmt nicht (erwartet {expected}, erhalten {sha}). Download verworfen.");
+
+                ct.ThrowIfCancellationRequested();
+                progress?.Report(new InstallProgress(InstallPhase.Extracting, 0, null));
+                await Task.Run(() => Extract(zipPath, content, game.StripTopFolder, ct), ct).ConfigureAwait(false);
+            }
 
             var exe = FileSystemUtil.SafeCombine(content, game.Exe);
             if (exe is null || !File.Exists(exe))
