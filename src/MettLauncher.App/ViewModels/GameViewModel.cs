@@ -76,6 +76,10 @@ public sealed partial class GameViewModel : ObservableObject, IOverlayGame
         RebuildActivity();
     }
 
+    public IReadOnlyList<MettLauncher.App.Views.OverlayNews> OverlayNews =>
+        [.. Activity.Where(a => a.Kind != "ERFOLGE").Select(a => new MettLauncher.App.Views.OverlayNews(a.Title, a.Date.ToLocalTime().ToString("d. MMM", Formatting.De)))];
+    public Task StopAsync() => _s.Launcher.StopAsync(Entry);
+
     public TimeSpan TotalPlaytime => _s.Library.GetGame(Id)?.TotalPlaytime ?? TimeSpan.Zero;
 
     [ObservableProperty] public partial Bitmap? Cover { get; set; }

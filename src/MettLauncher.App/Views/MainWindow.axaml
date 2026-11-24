@@ -229,7 +229,7 @@
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                 <StackPanel Spacing="2">
                   <TextBlock Text="Overlay in Spielen" FontWeight="SemiBold" />
-                  <TextBlock Classes="caption" Text="Erfolge und das Overlay-Feld direkt im Spiel zeigen." TextWrapping="Wrap" />
+                  <TextBlock Classes="caption" Text="Erfolge und das Overlay direkt im Spiel zeigen." TextWrapping="Wrap" />
                 </StackPanel>
                 <ToggleSwitch Grid.Column="1" IsChecked="{Binding OverlayEnabled}" />
               </Grid>
@@ -255,7 +255,7 @@
             <Border Classes="settingrow">
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                 <StackPanel Spacing="2">
-                  <TextBlock Text="Overlay-Feld öffnen" FontWeight="SemiBold" />
+                  <TextBlock Text="Overlay öffnen" FontWeight="SemiBold" />
                   <TextBlock Classes="caption" Text="Am Controller: Select und Start zusammen. Das Spiel muss es unterstützen." TextWrapping="Wrap" />
                 </StackPanel>
                 <ComboBox Grid.Column="1" Width="230" ItemsSource="{Binding OverlayKeyNames}" SelectedIndex="{Binding OverlayKey}" VerticalAlignment="Center" />

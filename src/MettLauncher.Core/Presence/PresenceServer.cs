@@ -205,9 +205,10 @@ public sealed class PresenceServer : IDisposable
                 s.Token = Text(json, "token");
                 if (s.Token is null || !_tokens.TryGetValue(s.Token, out var game)) return false;
                 s.Game = game;
-                if (json.TryGetProperty("link", out _))
+                if (json.TryGetProperty("link", out var link))
                 {
                     s.IsLink = true;
+                    s.Version = link.TryGetInt32OrNull() ?? 1;
                     _links[game] = s;
                 }
             }
@@ -240,6 +241,9 @@ public sealed class PresenceServer : IDisposable
         return true;
     }
 
+    /// <summary>Was das Spiel an Overlay-Eingaben meldet: 2 = auch Loslassen der Maus; 0 = nicht verbunden.</summary>
+    public int LinkVersion(string gameId) => _links.TryGetValue(gameId, out var s) ? s.Version : 0;
+
     /// <summary>Schickt einem Spiel eine Zeile; ohne Verbindung passiert nichts.</summary>
     public async Task SendAsync(string gameId, string json)
     {
@@ -263,6 +267,7 @@ public sealed class PresenceServer : IDisposable
         public string? Game { get; set; }
         public string? Token { get; set; }
         public bool IsLink { get; set; }
+        public int Version { get; set; }
 
         public async Task WriteAsync(string line, CancellationToken stop)
         {

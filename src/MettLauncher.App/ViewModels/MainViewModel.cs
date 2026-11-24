@@ -38,6 +38,9 @@ public sealed partial class MainViewModel : ObservableObject
         OverlayBarCorner = (int)settings.OverlayBarCorner;
         OverlayKey = Math.Max(0, Array.IndexOf(OverlayKeys, settings.OverlayKey));
         KeepInBackground = settings.KeepInBackground switch { null => 0, true => 1, false => 2 };
+        // Das Overlay im Spiel kann diese Einstellungen auch ändern.
+        _s.Settings.Changed += (_, s) => Dispatcher.UIThread.Post(() =>
+            (OverlayBar, OverlaySound, OverlayCorner) = (s.OverlayBar, s.OverlaySound, (int)s.OverlayCorner));
         _s.Overlay.FindGame = id => Games.FirstOrDefault(g => g.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
         _s.Achievements.Changed += c => Dispatcher.UIThread.Post(() => Games.FirstOrDefault(g => g.Id.Equals(c.GameId, StringComparison.OrdinalIgnoreCase))?.RefreshAchievements());
         _s.Net.EventReceived += ev => Dispatcher.UIThread.Post(() => OnNetEvent(ev));
