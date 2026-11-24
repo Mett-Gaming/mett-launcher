@@ -46,8 +46,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     // ================= Overlay und Hintergrund =================
 
-    private static readonly string[] OverlayKeys = ["shift+tab", "f1", "f12", ""];
-    public string[] OverlayKeyNames { get; } = ["Umschalt + Tab", "F1", "F12", "Keins"];
+    private static readonly string[] OverlayKeys = ["f9", "shift+tab", "f1", "f12", ""];
+    public string[] OverlayKeyNames { get; } = ["F9", "Umschalt + Tab", "F1", "F12", "Keins"];
     /// <summary>In der Reihenfolge von <see cref="Core.Overlay.OverlayAnchor"/>.</summary>
     public string[] CornerNames { get; } = ["Oben links", "Oben rechts", "Unten links", "Unten rechts"];
     public string[] BackgroundNames { get; } = ["Nachfragen", "Im Hintergrund weiterlaufen", "Beenden"];

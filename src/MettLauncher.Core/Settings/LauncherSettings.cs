@@ -27,8 +27,8 @@ public sealed record LauncherSettings
     /// <summary>Leiste mit Bildrate, Uhr und Sitzungsdauer.</summary>
     public bool OverlayBar { get; init; }
     public OverlayAnchor OverlayBarCorner { get; init; } = OverlayAnchor.TopLeft;
-    /// <summary>Tastenkürzel für das Overlay-Feld, z. B. <c>shift+tab</c>; leer = keins.</summary>
-    public string OverlayKey { get; init; } = "shift+tab";
+    /// <summary>Tastenkürzel für das Overlay-Feld, z. B. <c>f9</c>; leer = keins.</summary>
+    public string OverlayKey { get; init; } = "f9";
     /// <summary>Schließen während eines Spiels: im Hintergrund weiterlaufen? <c>null</c> = fragen.</summary>
     public bool? KeepInBackground { get; init; }
 }
