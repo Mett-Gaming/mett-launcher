@@ -1,9 +1,11 @@
 using MettLauncher.Core;
+using MettLauncher.Core.Achievements;
 using MettLauncher.Core.Catalog;
 using MettLauncher.Core.GitHub;
 using MettLauncher.Core.Install;
 using MettLauncher.Core.Launch;
 using MettLauncher.Core.News;
+using MettLauncher.Core.Overlay;
 using MettLauncher.Core.Presence;
 using MettLauncher.Core.Proton;
 using MettLauncher.Core.Settings;
@@ -38,6 +40,13 @@ public sealed class AppServices : IDisposable
         Images = new ImageCache(Http, Paths);
         LauncherUpdates = new LauncherUpdateService();
         PresenceServer = new PresenceServer();
+        Achievements = new AchievementService(new AchievementStore(Paths.LocalProfileDir), id => Library.GetGame(id)?.InstallPath);
+        Achievements.Problem += text => System.Diagnostics.Trace.WriteLine(text);
+        PresenceServer.Achievement = Achievements.Report;
+        OverlayServer = new OverlayServer();
+        OverlayServer.Start();
+        Layer = new OverlayLayer(Paths, AppContext.BaseDirectory);
+        Overlay = new OverlayService(OverlayServer, PresenceServer, Layer, Achievements, Launcher, Settings);
         PresenceServer.Start();
         Discord = new DiscordPresence();
         Presence = new PresenceService(PresenceServer, Discord.Show, Launcher, Settings, Catalog.ResolveAssetUrl);
@@ -46,6 +55,10 @@ public sealed class AppServices : IDisposable
     }
 
     public NetService Net { get; }
+    public AchievementService Achievements { get; }
+    public OverlayServer OverlayServer { get; }
+    public OverlayLayer Layer { get; }
+    public OverlayService Overlay { get; }
     public PresenceServer PresenceServer { get; }
     public DiscordPresence Discord { get; }
     public PresenceService Presence { get; }
@@ -71,6 +84,7 @@ public sealed class AppServices : IDisposable
     public void Dispose()
     {
         Net.Dispose();
+        OverlayServer.Dispose();
         PresenceServer.Dispose();
         Discord.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(1));
         Http.Dispose();

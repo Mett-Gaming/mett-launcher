@@ -36,6 +36,8 @@ public sealed record LauncherPaths(string Root)
     public string NetDir => Path.Combine(Root, "net");
     /// <summary>Erfolge ohne Konto.</summary>
     public string LocalProfileDir => Path.Combine(Root, "profiles", "local");
+    /// <summary>Overlay-Bibliothek, die in Spiele geladen wird (Kopie, damit Updates nicht an offenen Dateien scheitern).</summary>
+    public string OverlayDir => Path.Combine(Root, "overlay");
     public string LibraryFile => Path.Combine(Root, "library.json");
     public string SettingsFile => Path.Combine(Root, "settings.json");
     public string DefaultGamesDir => Path.Combine(Root, "games");

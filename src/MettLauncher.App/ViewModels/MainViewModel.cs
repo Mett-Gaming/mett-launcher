@@ -11,7 +11,7 @@ using MettLauncher.Core.News;
 namespace MettLauncher.App.ViewModels;
 
 public enum Section { Library, News, Settings }
-public enum SettingsCategory { Library, Updates, Multiplayer, Proton, About }
+public enum SettingsCategory { Library, Updates, Overlay, Multiplayer, Proton, About }
 
 public sealed partial class MainViewModel : ObservableObject
 {
@@ -30,8 +30,69 @@ public sealed partial class MainViewModel : ObservableObject
         DisplayName = _s.Settings.Current.DisplayName ?? "";
         ProtonLog = _s.Settings.Current.ProtonLog;
         DiscordPresence = _s.Settings.Current.DiscordPresence;
+        var settings = _s.Settings.Current;
+        OverlayEnabled = settings.Overlay;
+        OverlaySound = settings.OverlaySound;
+        OverlayCorner = (int)settings.OverlayCorner;
+        OverlayBar = settings.OverlayBar;
+        OverlayBarCorner = (int)settings.OverlayBarCorner;
+        OverlayKey = Math.Max(0, Array.IndexOf(OverlayKeys, settings.OverlayKey));
+        KeepInBackground = settings.KeepInBackground switch { null => 0, true => 1, false => 2 };
+        _s.Overlay.FindGame = id => Games.FirstOrDefault(g => g.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+        _s.Achievements.Changed += c => Dispatcher.UIThread.Post(() => Games.FirstOrDefault(g => g.Id.Equals(c.GameId, StringComparison.OrdinalIgnoreCase))?.RefreshAchievements());
         _s.Net.EventReceived += ev => Dispatcher.UIThread.Post(() => OnNetEvent(ev));
         UpdateNetStatus();
+    }
+
+    // ================= Overlay und Hintergrund =================
+
+    private static readonly string[] OverlayKeys = ["shift+tab", "f1", "f12", ""];
+    public string[] OverlayKeyNames { get; } = ["Umschalt + Tab", "F1", "F12", "Keins"];
+    /// <summary>In der Reihenfolge von <see cref="Core.Overlay.OverlayAnchor"/>.</summary>
+    public string[] CornerNames { get; } = ["Oben links", "Oben rechts", "Unten links", "Unten rechts"];
+    public string[] BackgroundNames { get; } = ["Nachfragen", "Im Hintergrund weiterlaufen", "Beenden"];
+    public string OverlayHint => !_s.Layer.IsAvailable ? "Die Overlay-Bibliothek fehlt. Einblendungen erscheinen als kleines Fenster."
+        : "Wirkt ab dem nächsten Spielstart. Im Spiel sichtbar bei Vulkan-Spielen" + (IsLinux ? " und DirectX-Spielen über Proton." : ", sonst als kleines Fenster.");
+
+    [ObservableProperty] public partial bool OverlayEnabled { get; set; }
+    partial void OnOverlayEnabledChanged(bool value) => _s.Settings.Update(s => s with { Overlay = value });
+    [ObservableProperty] public partial bool OverlaySound { get; set; }
+    partial void OnOverlaySoundChanged(bool value) => _s.Settings.Update(s => s with { OverlaySound = value });
+    [ObservableProperty] public partial int OverlayCorner { get; set; }
+    partial void OnOverlayCornerChanged(int value) => _s.Settings.Update(s => s with { OverlayCorner = (Core.Overlay.OverlayAnchor)Math.Clamp(value, 0, 3) });
+    [ObservableProperty] public partial bool OverlayBar { get; set; }
+    partial void OnOverlayBarChanged(bool value) => _s.Settings.Update(s => s with { OverlayBar = value });
+    [ObservableProperty] public partial int OverlayBarCorner { get; set; }
+    partial void OnOverlayBarCornerChanged(int value) => _s.Settings.Update(s => s with { OverlayBarCorner = (Core.Overlay.OverlayAnchor)Math.Clamp(value, 0, 3) });
+    [ObservableProperty] public partial int OverlayKey { get; set; }
+    partial void OnOverlayKeyChanged(int value) => _s.Settings.Update(s => s with { OverlayKey = OverlayKeys[Math.Clamp(value, 0, OverlayKeys.Length - 1)] });
+    [ObservableProperty] public partial int KeepInBackground { get; set; }
+    partial void OnKeepInBackgroundChanged(int value) => _s.Settings.Update(s => s with { KeepInBackground = value switch { 1 => true, 2 => false, _ => null } });
+
+    public bool AnyGameRunning => _s.Launcher.AnyRunning;
+    public bool? KeepInBackgroundChoice => _s.Settings.Current.KeepInBackground;
+    /// <summary>Von der View gesetzt: in den Hintergrund bzw. beenden.</summary>
+    public Action<bool>? LeaveWindow { get; set; }
+
+    [ObservableProperty] public partial bool IsLeaveDialogOpen { get; set; }
+    [ObservableProperty] public partial bool RememberLeave { get; set; }
+    partial void OnIsLeaveDialogOpenChanged(bool value) => OnPropertyChanged(nameof(IsAnyDialogOpen));
+
+    public void AskLeave()
+    {
+        CloseDialogs();
+        RememberLeave = false;
+        IsLeaveDialogOpen = true;
+    }
+
+    [RelayCommand] private void LeaveToBackground() => Leave(true);
+    [RelayCommand] private void LeaveAndQuit() => Leave(false);
+
+    private void Leave(bool background)
+    {
+        IsLeaveDialogOpen = false;
+        if (RememberLeave) KeepInBackground = background ? 1 : 2;
+        LeaveWindow?.Invoke(background);
     }
 
     // ================= Linux / Proton =================
@@ -336,7 +397,7 @@ public sealed partial class MainViewModel : ObservableObject
     public bool HasDownload => ActiveDownload is not null;
     public bool ShowIdleDownloads => !HasDownload && !HasToolDownload;
     public bool IsVersionDialogOpen => VersionDialogGame is not null;
-    public bool IsAnyDialogOpen => IsVersionDialogOpen || IsConfirmOpen || IsJoinDialogOpen || IsNameDialogOpen || IsProtonDialogOpen || IsLaunchUpdateOpen;
+    public bool IsAnyDialogOpen => IsVersionDialogOpen || IsConfirmOpen || IsJoinDialogOpen || IsNameDialogOpen || IsProtonDialogOpen || IsLaunchUpdateOpen || IsLeaveDialogOpen;
     public bool HasNews => NewsItems.Count > 0;
     public string GamesHeader => $"({Games.Count})";
     public string LauncherUpdateText => $"Mett Launcher {PendingLauncherVersion} ist bereit. Neustarten, um das Update abzuschließen.";
@@ -344,6 +405,7 @@ public sealed partial class MainViewModel : ObservableObject
     public bool IsCatLibrary => SettingsCategory == SettingsCategory.Library;
     public bool IsCatUpdates => SettingsCategory == SettingsCategory.Updates;
     public bool IsCatAbout => SettingsCategory == SettingsCategory.About;
+    public bool IsCatOverlay => SettingsCategory == SettingsCategory.Overlay;
     public bool IsCatMultiplayer => SettingsCategory == SettingsCategory.Multiplayer;
     public bool IsCatProton => SettingsCategory == SettingsCategory.Proton;
     public bool CanSelfUpdate => _s.LauncherUpdates.IsInstalled;
@@ -367,6 +429,7 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsCatLibrary));
         OnPropertyChanged(nameof(IsCatUpdates));
         OnPropertyChanged(nameof(IsCatAbout));
+        OnPropertyChanged(nameof(IsCatOverlay));
         OnPropertyChanged(nameof(IsCatMultiplayer));
         OnPropertyChanged(nameof(IsCatProton));
         if (value == SettingsCategory.Proton) RefreshProtonInfo();
@@ -495,6 +558,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand] private void ShowSettingsLibrary() => SettingsCategory = SettingsCategory.Library;
     [RelayCommand] private void ShowSettingsUpdates() => SettingsCategory = SettingsCategory.Updates;
     [RelayCommand] private void ShowSettingsAbout() => SettingsCategory = SettingsCategory.About;
+    [RelayCommand] private void ShowSettingsOverlay() => SettingsCategory = SettingsCategory.Overlay;
     [RelayCommand] private void ShowSettingsMultiplayer() => SettingsCategory = SettingsCategory.Multiplayer;
     [RelayCommand] private void ShowSettingsProton() => SettingsCategory = SettingsCategory.Proton;
 
@@ -561,6 +625,7 @@ public sealed partial class MainViewModel : ObservableObject
         JoinDialogGame = null;
         ProtonDialogGame = null;
         IsNameDialogOpen = false;
+        IsLeaveDialogOpen = false;
         _afterName = null;
         IsConfirmOpen = false;
         _confirmAction = null;

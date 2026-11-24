@@ -1,5 +1,6 @@
 using System.Text.Json;
 using MettLauncher.Core.IO;
+using MettLauncher.Core.Overlay;
 
 namespace MettLauncher.Core.Settings;
 
@@ -18,6 +19,18 @@ public sealed record LauncherSettings
     public bool ProtonLog { get; init; }
     /// <summary>Zeigt in Discord, was gespielt wird.</summary>
     public bool DiscordPresence { get; init; } = true;
+    /// <summary>Einblendungen und Overlay in Spielen.</summary>
+    public bool Overlay { get; init; } = true;
+    /// <summary>Ton bei einem neuen Erfolg.</summary>
+    public bool OverlaySound { get; init; } = true;
+    public OverlayAnchor OverlayCorner { get; init; } = OverlayAnchor.BottomRight;
+    /// <summary>Leiste mit Bildrate, Uhr und Sitzungsdauer.</summary>
+    public bool OverlayBar { get; init; }
+    public OverlayAnchor OverlayBarCorner { get; init; } = OverlayAnchor.TopLeft;
+    /// <summary>Tastenkürzel für das Overlay-Feld, z. B. <c>shift+tab</c>; leer = keins.</summary>
+    public string OverlayKey { get; init; } = "shift+tab";
+    /// <summary>Schließen während eines Spiels: im Hintergrund weiterlaufen? <c>null</c> = fragen.</summary>
+    public bool? KeepInBackground { get; init; }
 }
 
 /// <summary>Lädt/speichert <c>settings.json</c>.</summary>

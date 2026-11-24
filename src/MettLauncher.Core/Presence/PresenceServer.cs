@@ -61,10 +61,13 @@ public sealed class PresenceServer : IDisposable
 {
     public const string AddressVariable = "METT_PRESENCE_ADDR";
     public const string TokenVariable = "METT_PRESENCE_TOKEN";
+    /// <summary>Gesetzt, wenn der Launcher Erfolge und Overlay-Eingaben annimmt (zweite Verbindung mit <c>"link":1</c>).</summary>
+    public const string LinkVariable = "METT_LAUNCHER_LINK";
     /// <summary>Längste Zeile (Byte); wer mehr schickt, wird getrennt.</summary>
     private const int MaxLine = 4096;
 
     private readonly ConcurrentDictionary<string, string> _tokens = new(); // Token -> Spiel
+    private readonly ConcurrentDictionary<string, Session> _links = new(StringComparer.OrdinalIgnoreCase);
     private readonly CancellationTokenSource _stop = new();
     private TcpListener? _listener;
 
@@ -76,6 +79,12 @@ public sealed class PresenceServer : IDisposable
     /// bekommt dann eine Bestätigung und meldet es nicht noch einmal.
     /// </summary>
     public Func<string, string, int?, bool>? Achievement { get; set; }
+
+    /// <summary>Overlay-Meldung eines Spiels (<c>{"overlay":…}</c> oder <c>{"ui":[…]}</c>). Auf einem Hintergrund-Thread.</summary>
+    public event Action<string, JsonElement>? Overlay;
+
+    /// <summary>Spiel trennt die Verbindung für Erfolge und Overlay.</summary>
+    public event Action<string>? LinkClosed;
 
     public bool IsRunning => _listener is not null;
 
@@ -106,6 +115,7 @@ public sealed class PresenceServer : IDisposable
         {
             [AddressVariable] = $"127.0.0.1:{ep.Port}",
             [TokenVariable] = token,
+            [LinkVariable] = "1",
         };
     }
 
@@ -133,13 +143,13 @@ public sealed class PresenceServer : IDisposable
 
     private async Task ServeAsync(TcpClient client)
     {
-        string? game = null, token = null;
-        var budget = new ReportBudget();
+        Session? session = null;
         using (client)
         {
             try
             {
                 var stream = client.GetStream();
+                session = new Session(stream);
                 var buffer = new byte[MaxLine];
                 var used = 0;
                 while (true)
@@ -153,9 +163,9 @@ public sealed class PresenceServer : IDisposable
                         var line = Encoding.UTF8.GetString(buffer, 0, end);
                         Buffer.BlockCopy(buffer, end + 1, buffer, 0, used - end - 1);
                         used -= end + 1;
-                        if (!Handle(line, ref game, ref token, budget, out var ack)) return;
+                        if (!Handle(line, session, out var ack)) return;
                         if (ack is { } n)
-                            await stream.WriteAsync(Encoding.UTF8.GetBytes($"{{\"ack\":{n}}}\n"), _stop.Token).ConfigureAwait(false);
+                            await session.WriteAsync($"{{\"ack\":{n}}}", _stop.Token).ConfigureAwait(false);
                     }
                     if (used == buffer.Length) return; // Zeile zu lang
                 }
@@ -166,14 +176,21 @@ public sealed class PresenceServer : IDisposable
             }
             finally
             {
-                // Ein Neustart mit neuem Token darf von der alten Verbindung nicht gelöscht werden.
-                if (game is not null && _tokens.ContainsKey(token!)) Changed?.Invoke(game, null);
+                if (session?.Game is { } game)
+                {
+                    if (session.IsLink)
+                    {
+                        if (_links.TryRemove(KeyValuePair.Create(game, session))) LinkClosed?.Invoke(game);
+                    }
+                    // Ein Neustart mit neuem Token darf von der alten Verbindung nicht gelöscht werden.
+                    else if (_tokens.ContainsKey(session.Token!)) Changed?.Invoke(game, null);
+                }
             }
         }
     }
 
     /// <returns><c>false</c> = Verbindung trennen.</returns>
-    private bool Handle(string line, ref string? game, ref string? token, ReportBudget budget, out long? ack)
+    private bool Handle(string line, Session s, out long? ack)
     {
         ack = null;
         if (string.IsNullOrWhiteSpace(line)) return true;
@@ -182,47 +199,88 @@ public sealed class PresenceServer : IDisposable
             using var doc = JsonDocument.Parse(line);
             var json = doc.RootElement;
             if (json.ValueKind != JsonValueKind.Object) return false;
-            if (game is null)
+            if (s.Game is null)
             {
                 // Erste Zeile: Token vorzeigen (darf schon einen Status enthalten)
-                token = json.TryGetProperty("token", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() : null;
-                if (token is null || !_tokens.TryGetValue(token, out game)) { game = null; return false; }
+                s.Token = Text(json, "token");
+                if (s.Token is null || !_tokens.TryGetValue(s.Token, out var game)) return false;
+                s.Game = game;
+                if (json.TryGetProperty("link", out _))
+                {
+                    s.IsLink = true;
+                    _links[game] = s;
+                }
             }
             // Erfolge zählen auch noch, wenn das Spiel gerade beendet wurde.
-            if (Text(json, "unlock") is { } unlock) return Report(game, json, unlock, null, budget, out ack);
+            if (Text(json, "unlock") is { } unlock) return Report(s, json, unlock, null, out ack);
             if (Text(json, "progress") is { } progress)
-                return Report(game, json, progress, json.TryGetProperty("value", out var v) ? v.TryGetInt32OrNull() ?? 0 : 0, budget, out ack);
-            if (!_tokens.ContainsKey(token!)) return false; // Spiel beendet
-            Changed?.Invoke(game, GamePresence.From(json));
+                return Report(s, json, progress, json.TryGetProperty("value", out var v) ? v.TryGetInt32OrNull() ?? 0 : 0, out ack);
+            if (!_tokens.ContainsKey(s.Token!)) return false; // Spiel beendet
+            if (!s.IsLink) Changed?.Invoke(s.Game, GamePresence.From(json));
+            else if (json.TryGetProperty("overlay", out _) || json.TryGetProperty("ui", out _)) Overlay?.Invoke(s.Game, json.Clone());
             return true;
         }
         catch (JsonException)
         {
-            return game is not null; // kaputte Meldung überspringen
+            return s.Game is not null; // kaputte Meldung überspringen
         }
     }
 
     private static string? Text(JsonElement json, string key) =>
         json.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
-    private bool Report(string game, JsonElement json, string id, int? value, ReportBudget budget, out long? ack)
+    private bool Report(Session s, JsonElement json, string id, int? value, out long? ack)
     {
         ack = null;
-        if (!budget.Take()) return true; // zu viele auf einmal: ohne Bestätigung, das Spiel meldet sie später noch einmal
+        if (!s.TakeReport()) return true; // zu viele auf einmal: ohne Bestätigung, das Spiel meldet sie später noch einmal
         // Ungültige Ids werden bestätigt, sonst kämen sie immer wieder.
-        var done = !Achievements.AchievementDefinitions.IsId(id) || (Achievement?.Invoke(game, id, value) ?? false);
+        var done = !Achievements.AchievementDefinitions.IsId(id) || (Achievement?.Invoke(s.Game!, id, value) ?? false);
         if (done && json.TryGetProperty("n", out var n) && n.ValueKind == JsonValueKind.Number && n.TryGetInt64(out var number))
             ack = number;
         return true;
     }
 
-    /// <summary>Höchstens 300 Erfolgsmeldungen in zehn Sekunden je Verbindung.</summary>
-    private sealed class ReportBudget
+    /// <summary>Schickt einem Spiel eine Zeile; ohne Verbindung passiert nichts.</summary>
+    public async Task SendAsync(string gameId, string json)
     {
+        if (!_links.TryGetValue(gameId, out var s)) return;
+        try
+        {
+            await s.WriteAsync(json, _stop.Token).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or SocketException or OperationCanceledException or ObjectDisposedException)
+        {
+            // Spiel beendet
+        }
+    }
+
+    private sealed class Session(NetworkStream stream)
+    {
+        private readonly SemaphoreSlim _turn = new(1, 1);
         private long _start = Environment.TickCount64;
         private int _used;
 
-        public bool Take()
+        public string? Game { get; set; }
+        public string? Token { get; set; }
+        public bool IsLink { get; set; }
+
+        public async Task WriteAsync(string line, CancellationToken stop)
+        {
+            await _turn.WaitAsync(stop).ConfigureAwait(false);
+            try
+            {
+                using var limit = CancellationTokenSource.CreateLinkedTokenSource(stop);
+                limit.CancelAfter(TimeSpan.FromSeconds(5));
+                await stream.WriteAsync(Encoding.UTF8.GetBytes(line + "\n"), limit.Token).ConfigureAwait(false);
+            }
+            finally
+            {
+                _turn.Release();
+            }
+        }
+
+        /// <summary>Höchstens 300 Erfolgsmeldungen in zehn Sekunden.</summary>
+        public bool TakeReport()
         {
             if (Environment.TickCount64 - _start > 10_000) (_start, _used) = (Environment.TickCount64, 0);
             return ++_used <= 300;

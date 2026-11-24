@@ -263,4 +263,88 @@ public sealed class AchievementTests : IDisposable
         Assert.Equal(0, await client.GetStream().ReadAsync(new byte[1]).AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.False(server.IsConnected("kasse0"));
     }
+
+    // ---- Overlay-Eingabe ----
+
+    [Fact]
+    public async Task Link_carries_overlay_messages_both_ways_and_never_touches_the_status()
+    {
+        using var server = new PresenceServer();
+        var status = 0;
+        var seen = new List<string>();
+        var closed = false;
+        server.Changed += (_, _) => status++;
+        server.Overlay += (g, json) => { lock (seen) seen.Add(g + json.GetRawText()); };
+        server.LinkClosed += _ => closed = true;
+        server.Start();
+        var env = server.Register("kasse0");
+        Assert.Equal("1", env[PresenceServer.LinkVariable]);
+        using (var client = new TcpClient())
+        {
+            await client.ConnectAsync(IPEndPoint.Parse(env[PresenceServer.AddressVariable]));
+            var w = new StreamWriter(client.GetStream(), new UTF8Encoding(false)) { AutoFlush = true, NewLine = "
+" };
+            var r = new StreamReader(client.GetStream());
+            await w.WriteLineAsync($$"""{"token":"{{env[PresenceServer.TokenVariable]}}","link":1}""");
+            await w.WriteLineAsync("""{"overlay":"toggle"}""");
+            await Until(() => { lock (seen) return seen.Count == 1; });
+            Assert.Equal("""kasse0{"overlay":"toggle"}""", seen[0]);
+            await server.SendAsync("kasse0", """{"overlay":true}""");
+            Assert.Equal("""{"overlay":true}""", await r.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(5)));
+        }
+        await Until(() => closed);
+        Assert.Equal(0, status);
+        await server.SendAsync("kasse0", "{}"); // ohne Verbindung: nichts
+    }
+
+    // ---- Schicht bereitlegen ----
+
+    [Fact]
+    public void Layer_is_copied_and_switched_on_for_the_game_only()
+    {
+        Directory.CreateDirectory(_tmp.Sub("app"));
+        File.WriteAllText(_tmp.Sub("app", "mett_overlay.dll"), "eins");
+        var layer = new OverlayLayer(_tmp.Paths, _tmp.Sub("app"), windows: true);
+        var env = layer.Environment(k => k == "VK_INSTANCE_LAYERS" ? "VK_LAYER_andere" : null);
+        Assert.Equal("VK_LAYER_METT_overlay;VK_LAYER_andere", env["VK_INSTANCE_LAYERS"]);
+        var dir = env["VK_ADD_LAYER_PATH"];
+        using var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "mett_overlay.json")));
+        Assert.Equal("eins", File.ReadAllText(json.RootElement.GetProperty("layer").GetProperty("library_path").GetString()!));
+        Assert.Equal(env["VK_ADD_LAYER_PATH"], layer.Environment(_ => null)["VK_ADD_LAYER_PATH"]);
+        File.WriteAllText(_tmp.Sub("app", "mett_overlay.dll"), "zwei");
+        Assert.NotEqual(dir, layer.Environment(_ => null)["VK_ADD_LAYER_PATH"]);
+        Assert.False(Directory.Exists(dir)); // alte Fassung weg
+    }
+
+    [Fact]
+    public void Linux_layer_needs_the_variable()
+    {
+        Directory.CreateDirectory(_tmp.Sub("app"));
+        File.WriteAllText(_tmp.Sub("app", "libmett_overlay.so"), "eins");
+        var layer = new OverlayLayer(_tmp.Paths, _tmp.Sub("app"), _tmp.Sub("share"), windows: false);
+        Assert.Equal(new Dictionary<string, string> { ["METT_OVERLAY"] = "1" }, layer.Environment(_ => null));
+        using var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(_tmp.Sub("share", "vulkan", "implicit_layer.d", "mett_overlay.json")));
+        Assert.Equal("1", json.RootElement.GetProperty("layer").GetProperty("enable_environment").GetProperty("METT_OVERLAY").GetString());
+    }
+
+    [Fact]
+    public void Without_the_library_games_start_without_overlay() =>
+        Assert.Empty(new OverlayLayer(_tmp.Paths, _tmp.Path).Environment(_ => null));
+
+    [Fact]
+    public void Toasts_wait_for_a_free_place()
+    {
+        var q = new ToastQueue<string>(2, TimeSpan.FromSeconds(5));
+        foreach (var t in new[] { "a", "b", "c" }) q.Add(t);
+        var log = new List<string>();
+        void Step(double seconds) => q.Step(DateTimeOffset.UnixEpoch.AddSeconds(seconds), t => log.Add("-" + t), (i, t) => log.Add($"+{i}{t}"));
+        Step(0);
+        Step(4);
+        Assert.Equal(["+0a", "+1b"], log);
+        Step(5);
+        Assert.Equal(["+0a", "+1b", "-a", "-b", "+0c"], log);
+        Assert.False(q.IsEmpty);
+        Step(10);
+        Assert.True(q.IsEmpty);
+    }
 }

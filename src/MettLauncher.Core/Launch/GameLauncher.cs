@@ -115,6 +115,8 @@ public sealed class GameLauncher
     public event EventHandler<GameSession>? GameStarted;
     public event EventHandler<GameExitInfo>? GameExited;
 
+    public bool AnyRunning => !_running.IsEmpty;
+
     public bool IsRunning(string gameId) => _running.ContainsKey(gameId);
 
     public GameSession? GetSession(string gameId) => _running.GetValueOrDefault(gameId);

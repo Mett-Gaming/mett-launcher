@@ -17,7 +17,7 @@ namespace MettLauncher.App.ViewModels;
 public enum GamePhase { Loading, NotInstalled, UpdateAvailable, Ready, Installing, Running }
 
 /// <summary>Ein Spiel aus dem Katalog: Status, Hauptaktion, Infos, Aktivität, Versionen.</summary>
-public sealed partial class GameViewModel : ObservableObject
+public sealed partial class GameViewModel : ObservableObject, IOverlayGame
 {
     private readonly AppServices _s;
     private readonly MainViewModel _main;
@@ -44,6 +44,24 @@ public sealed partial class GameViewModel : ObservableObject
 
     public ObservableCollection<ActivityItemViewModel> Activity { get; } = [];
     public ObservableCollection<VersionItemViewModel> Versions { get; } = [];
+
+    // ---- Erfolge ----
+    [ObservableProperty] public partial IReadOnlyList<AchievementViewModel> Achievements { get; set; } = [];
+    public bool HasAchievements => Achievements.Count > 0;
+    public int AchievementsUnlocked => Achievements.Count(a => a.Unlocked);
+    public string AchievementsText => $"{AchievementsUnlocked} von {Achievements.Count}";
+    public double AchievementsFraction => HasAchievements ? (double)AchievementsUnlocked / Achievements.Count : 0;
+    partial void OnAchievementsChanged(IReadOnlyList<AchievementViewModel> value)
+    {
+        foreach (var p in new[] { nameof(HasAchievements), nameof(AchievementsUnlocked), nameof(AchievementsText), nameof(AchievementsFraction), nameof(SidebarCount) })
+            OnPropertyChanged(p);
+    }
+    /// <summary>Zähler in der Bibliothek, wenn dort sonst nichts steht.</summary>
+    public string? SidebarCount => SidebarStatus is null && HasAchievements && !SidebarDimmed ? $"{AchievementsUnlocked}/{Achievements.Count}" : null;
+
+    public void RefreshAchievements() => Achievements = AchievementViewModel.All(_s.Achievements.Definitions(Id), _s.Achievements.States(Id));
+
+    public TimeSpan TotalPlaytime => _s.Library.GetGame(Id)?.TotalPlaytime ?? TimeSpan.Zero;
 
     [ObservableProperty] public partial Bitmap? Cover { get; set; }
     [ObservableProperty] public partial Bitmap? Hero { get; set; }
@@ -107,7 +125,7 @@ public sealed partial class GameViewModel : ObservableObject
     private void NotifyPhase()
     {
         foreach (var p in new[] { nameof(PrimaryLabel), nameof(PrimaryIcon), nameof(PrimaryIsMuted), nameof(ShowPrimary), nameof(PrimaryFilledIcon), nameof(ShowSecondaryPlay),
-                     nameof(SidebarStatus), nameof(SidebarStatusIsHighlight), nameof(SidebarDimmed), nameof(IsBusy), nameof(IsInstalled) })
+                     nameof(SidebarStatus), nameof(SidebarStatusIsHighlight), nameof(SidebarCount), nameof(SidebarDimmed), nameof(IsBusy), nameof(IsInstalled) })
             OnPropertyChanged(p);
     }
     partial void OnPercentTextChanged(string value) => OnPropertyChanged(nameof(SidebarStatus));
@@ -189,6 +207,8 @@ public sealed partial class GameViewModel : ObservableObject
                 isPinned: string.Equals(r.Tag, state?.PinnedTag, StringComparison.OrdinalIgnoreCase)));
 
         RebuildActivity();
+        _s.Achievements.Reload(Id);
+        RefreshAchievements();
         OnPropertyChanged(nameof(IsInstalled));
     }
 
@@ -252,6 +272,8 @@ public sealed partial class GameViewModel : ObservableObject
     [ObservableProperty] public partial string? SessionCode { get; set; }
     [ObservableProperty] public partial int PeerCount { get; set; }
     [ObservableProperty] public partial string? SessionText { get; set; }
+    /// <summary>Namen der Mitspieler, soweit bekannt.</summary>
+    public IReadOnlyList<string> Players { get; private set; } = [];
     public bool HasSession => SessionText is not null;
     public bool IsHosting => SessionCode is not null;
     public string SessionCodeDisplay => SessionCode is null ? "" : string.Join(" ", Enumerable.Range(0, (SessionCode.Length + 7) / 8)
@@ -267,9 +289,11 @@ public sealed partial class GameViewModel : ObservableObject
             case "hosted":
                 SessionCode = (string?)data["code"];
                 PeerCount = 0;
+                Players = [];
                 SessionText = "Du hostest · noch keine Mitspieler";
                 break;
             case "peers":
+                Players = data["names"] is System.Text.Json.Nodes.JsonArray names ? [.. names.Select(n => (string?)n ?? "")] : [];
                 PeerCount = (int?)data["count"] ?? 0;
                 SessionText = PeerCount switch
                 {
@@ -280,11 +304,13 @@ public sealed partial class GameViewModel : ObservableObject
                 break;
             case "joined":
                 SessionCode = null;
+                Players = [];
                 SessionText = $"Verbunden mit {(string?)data["host"]}";
                 break;
             case "ended":
                 SessionCode = null;
                 SessionText = null;
+                Players = [];
                 PeerCount = 0;
                 break;
         }
@@ -306,7 +332,7 @@ public sealed partial class GameViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task CopyCodeAsync()
+    public async Task CopyCodeAsync()
     {
         if (SessionCode is not null) await _main.CopyAsync(SessionCode);
     }
@@ -361,7 +387,7 @@ public sealed partial class GameViewModel : ObservableObject
             // Erst jetzt holen: ein Update kann gedauert haben.
             var env = IsMultiplayer || action is not null ? _s.Net.GameEnvironment(Id, action, code) : null;
             if (env is null && action is not null) { ShowNetNotReady(); return; }
-            var session = _s.Launcher.Launch(Entry, _s.Presence.Environment(Id, env));
+            var session = _s.Launcher.Launch(Entry, _s.Overlay.Environment(Id, _s.Presence.Environment(Id, env)));
             Phase = GamePhase.Running;
             LastPlayedText = "Jetzt";
             _ = session.Exited.ContinueWith(t => Dispatcher.UIThread.Post(() =>

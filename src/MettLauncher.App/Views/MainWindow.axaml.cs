@@ -25,6 +25,7 @@ public partial class MainWindow : Window
         MaxButton.Click += (_, _) => ToggleMaximize();
         CloseButton.Click += (_, _) => Close();
         Scrim.PointerPressed += (_, _) => (DataContext as MainViewModel)?.CloseDialogs();
+        Closing += OnClosing;
         KeyDown += (_, e) => { if (e.Key == Key.Escape) (DataContext as MainViewModel)?.CloseDialogs(); };
     }
 
@@ -34,8 +35,33 @@ public partial class MainWindow : Window
         if (DataContext is MainViewModel vm)
         {
             vm.PickFolder = PickFolderAsync;
+            vm.LeaveWindow = Leave;
             vm.CopyText = async text => { if (Clipboard is { } cb) await cb.SetTextAsync(text); };
         }
+    }
+
+    private bool _leaving;
+
+    private void OnClosing(object? sender, WindowClosingEventArgs e)
+    {
+        if (_leaving || e.CloseReason is WindowCloseReason.ApplicationShutdown or WindowCloseReason.OSShutdown
+            || DataContext is not MainViewModel { AnyGameRunning: true } vm) return;
+        if (vm.KeepInBackgroundChoice == false) return;
+        e.Cancel = true;
+        if (vm.KeepInBackgroundChoice is null) vm.AskLeave();
+        else Leave(true);
+    }
+
+    private void Leave(bool background)
+    {
+        if (!background)
+        {
+            _leaving = true;
+            Close();
+        }
+        // Unter Linux gibt es nicht überall ein Symbol im Infobereich -> nur minimieren.
+        else if (OperatingSystem.IsWindows()) Hide();
+        else WindowState = WindowState.Minimized;
     }
 
     private void OnDragAreaPressed(object? sender, PointerPressedEventArgs e)

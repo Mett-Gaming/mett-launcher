@@ -176,7 +176,7 @@ public class PresenceTests
         Assert.Equal("Im Launcher", (string?)shown!.Activity["details"]);
 
         var env = service.Environment("kasse0", new Dictionary<string, string> { ["METT_NET_ADDR"] = "a" });
-        Assert.Equal(3, env.Count);
+        Assert.Equal(4, env.Count);
         var session = launcher.Launch(game, env);
         Assert.Equal((LauncherApp, 4242, "KASSE 0"), (shown!.AppId, shown.ProcessId, (string?)shown.Activity["details"]));
         var (client, w) = await Connect(env);

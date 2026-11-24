@@ -38,11 +38,19 @@ pub struct HostState {
     game: String,
     to_game: mpsc::Sender<Frame>,
     peers: Mutex<HashMap<u16, PeerLink>>,
+    names: std::sync::Mutex<std::collections::BTreeMap<u16, String>>,
     next_peer: AtomicU16,
     max_peers: u16,
 }
 
 impl HostState {
+    /// Ändert die Namensliste und gibt sie für das Ereignis zurück.
+    fn change_names(&self, change: impl FnOnce(&mut std::collections::BTreeMap<u16, String>)) -> Vec<String> {
+        let mut names = self.names.lock().unwrap_or_else(|e| e.into_inner());
+        change(&mut names);
+        names.values().cloned().collect()
+    }
+
     /// Nimmt einen Mitspieler auf (Handshake ist gelesen).
     pub async fn add_peer(
         self: &Arc<Self>,
@@ -77,15 +85,17 @@ impl HostState {
                     if host.peers.lock().await.remove(&idx).is_some() {
                         let _ = host.to_game.send(Frame::json(kind::PEER_LEFT, &PeerLeft { peer: idx, reason })).await;
                         let count = host.peers.lock().await.len();
-                        ev_shared.event(json!({ "event": "peers", "game": host.game, "role": "host", "count": count }));
+                        let names = host.change_names(|n| drop(n.remove(&idx)));
+                        ev_shared.event(json!({ "event": "peers", "game": host.game, "role": "host", "count": count, "names": names }));
                     }
                 }
             });
         });
         self.peers.lock().await.insert(idx, link);
+        let names = self.change_names(|n| drop(n.insert(idx, name.clone())));
         self.to_game.send(Frame::json(kind::PEER_JOINED, &PeerJoined { peer: idx, id, name })).await?;
         let count = self.peers.lock().await.len();
-        shared.event(json!({ "event": "peers", "game": self.game, "role": "host", "count": count }));
+        shared.event(json!({ "event": "peers", "game": self.game, "role": "host", "count": count, "names": names }));
         Ok(())
     }
 
@@ -194,6 +204,7 @@ pub async fn run(shared: Arc<Shared>, stream: TcpStream) -> Result<()> {
                     game: game.clone(),
                     to_game: to_game.clone(),
                     peers: Mutex::new(HashMap::new()),
+                    names: std::sync::Mutex::default(),
                     next_peer: AtomicU16::new(1),
                     max_peers: req.max_peers,
                 });

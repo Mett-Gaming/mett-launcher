@@ -127,6 +127,47 @@
       <!-- Aktivität | Info -->
       <Grid ColumnDefinitions="*,272" ColumnSpacing="32" Margin="32,24">
         <StackPanel Spacing="12">
+          <!-- Erfolge -->
+          <StackPanel Spacing="10" IsVisible="{Binding HasAchievements}" Margin="0,0,0,12">
+            <Border Classes="sectionhead">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                <TextBlock Classes="overline" Text="ERFOLGE" />
+                <TextBlock Grid.Column="1" Classes="caption" Text="{Binding AchievementsText}" VerticalAlignment="Center" />
+              </Grid>
+            </Border>
+            <ProgressBar Value="{Binding AchievementsFraction}" Maximum="1" />
+            <ItemsControl ItemsSource="{Binding Achievements}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:AchievementViewModel">
+                  <Border Classes="card" Padding="10">
+                    <Grid ColumnDefinitions="44,*,Auto" ColumnSpacing="12">
+                      <Border Width="44" Height="44" CornerRadius="3" ClipToBounds="True" Background="{StaticResource BgSelected}">
+                        <Panel>
+                          <Image Source="{Binding Icon}" Stretch="UniformToFill" Opacity="{Binding IconOpacity}" IsVisible="{Binding HasIcon}" />
+                          <Panel IsVisible="{Binding !HasIcon}">
+                            <c:LucideIcon Width="22" Height="22" Data="{StaticResource IconTrophy}" Foreground="{StaticResource Brand}" IsVisible="{Binding Unlocked}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <c:LucideIcon Width="22" Height="22" Data="{StaticResource IconLock}" Foreground="{StaticResource TextMuted}" IsVisible="{Binding !Unlocked}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                          </Panel>
+                        </Panel>
+                      </Border>
+                      <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Classes="caption" Text="{Binding Text}" TextWrapping="Wrap" />
+                        <ProgressBar Value="{Binding Fraction}" Maximum="1" IsVisible="{Binding ShowProgress}" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Classes="caption" Text="{Binding Info}" VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+
           <Border Classes="sectionhead"><TextBlock Classes="overline" Text="AKTIVITÄT" /></Border>
           <TextBlock Classes="body" Text="Noch keine Meldungen zu diesem Spiel." IsVisible="{Binding !HasActivity}" />
           <ItemsControl ItemsSource="{Binding Activity}">
